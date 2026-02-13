@@ -1,0 +1,198 @@
+### LOCAL EKF ###
+ekf_filter_node_odom:
+    ros__parameters:
+        use_sim_time: false
+        frequency: 30.0
+        sensor_timeout: 0.2
+        two_d_mode: true
+        transform_timeout: 0.2
+        transform_time_offset: 0.2
+        print_diagnostics: true
+        debug: false
+        publish_tf: true
+
+        # Frame IDs
+        # map_frame: map
+        odom_frame: odom
+        base_link_frame: base_footprint
+        world_frame: odom # local odometry world frame
+
+        # Kiss Lidar Odometry
+        #* Does not use IMU data
+        odom0: /kiss/odometry
+        # prettier-ignore
+        odom0_config: [true, true, true, # !x, !y, z position
+                       true, true, true, # roll, pitch, !yaw
+                       false, false, false, # !x, !y, z velocity
+                       false, false, false, # roll, pitch, !yaw velocity
+                       false, false, false] # x, y, z acceleration
+        odom0_queue_size: 10
+        odom0_differential: false
+        odom0_relative: false
+        # odom0_pose_rejection_threshold: 1.5
+
+        # # IMU - BMI088
+        # # DOES NOT adapt for gravity
+        # # Orientation, angular velocity, linear acceleration
+        # imu0: /imu/BMI088_data
+        # # prettier-ignore
+        # imu0_config: [false, false, false, # x, y, z position
+        #               false, false, false, # roll, pitch, yaw
+        #               false, false, false, # x, y, z velocity
+        #               true, true, true, # roll, pitch, yaw velocity
+        #               true, true, true] # x, y, z acceleration
+        # imu0_queue_size: 10
+        # imu0_differential: false
+        # imu0_relative: false
+        # imu0_remove_gravitational_acceleration: true
+
+        # # # IMU - BNO085
+        # #* Adapts for gravity
+        # # Orientation, angular velocity, linear acceleration
+        # imu0: /imu/BNO085_filtered
+        # # prettier-ignore
+        # imu0_config: [false, false, false, # x, y, z position
+        #               true, true, true, # roll, pitch, yaw
+        #               false, false, false, # x, y, z velocity
+        #               true, true, true, # roll, pitch, yaw velocity
+        #               true, true, true] # x, y, z acceleration
+        # imu0_queue_size: 200
+        # imu0_differential: false
+        # imu0_relative: false
+        # # imu0_pose_rejection_threshold: 1.5
+        # # imu0_twist_rejection_threshold: 1.5
+        # # imu0_linear_acceleration_rejection_threshold: 1.5
+        # imu0_remove_gravitational_acceleration: false
+
+        #! RESET TO imu1 IF USING TWO IMUS, also /imu/LSM6DSOX_filtered uses filtered data, _data is raw
+        # # IMU - LSM6DSOX
+        #* Adapts for gravity
+        # Orientation, angular velocity, linear acceleration
+        imu0: /imu/LSM6DSOX_filtered
+        # prettier-ignore
+        imu0_config: [false, false, false, # x, y, z position
+                      true, true, true, # roll, pitch, yaw
+                      false, false, false, # x, y, z velocity
+                      false, false, false, # roll, pitch, yaw velocity
+                      false, false, false] # x, y, z acceleration
+        imu0_queue_size: 100
+        imu0_differential: true
+        imu0_relative: true
+        # imu0_pose_rejection_threshold: 1.5
+        # imu0_twist_rejection_threshold: 1.5
+        # imu0_linear_acceleration_rejection_threshold: 1.5
+        imu0_remove_gravitational_acceleration: true
+        # initial_estimate_covariance: [1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6]
+
+### GLOBAL EKF ###
+ekf_filter_node_map:
+    ros__parameters:
+        use_sim_time: false
+        frequency: 30.0
+        sensor_timeout: 0.2
+        two_d_mode: true
+        transform_timeout: 0.2
+        transform_time_offset: 0.2
+        print_diagnostics: true
+        debug: false
+        publish_tf: false
+
+        # Frame IDs
+        map_frame: map
+        odom_frame: odom
+        base_link_frame: base_footprint
+        world_frame: map # global odometry world frame
+
+        # Kiss Lidar Odometry
+        #* Does not use IMU data
+        odom0: /kiss/odometry
+        # prettier-ignore
+        odom0_config: [true, true, true, # !x, !y, z position
+                       true, true, true, # roll, pitch, !yaw
+                       false, false, false, # !x, !y, z velocity
+                       false, false, false, # roll, pitch, !yaw velocity
+                       false, false, false] # x, y, z acceleration
+        odom0_queue_size: 10
+        odom0_differential: false
+        odom0_relative: false
+        # odom0_pose_rejection_threshold: 1.5
+
+        # # IMU - BMI088
+        # # DOES NOT adapt for gravity
+        # # Orientation, angular velocity, linear acceleration
+        # imu0: /imu/BMI088_data
+        # # prettier-ignore
+        # imu0_config: [false, false, false, # x, y, z position
+        #               false, false, false, # roll, pitch, yaw
+        #               false, false, false, # x, y, z velocity
+        #               true, true, true, # roll, pitch, yaw velocity
+        #               true, true, true] # x, y, z acceleration
+        # imu0_queue_size: 10
+        # imu0_differential: false
+        # imu0_relative: false
+        # imu0_remove_gravitational_acceleration: true
+
+        # # # IMU - BNO085
+        # #* Adapts for gravity
+        # # Orientation, angular velocity, linear acceleration
+        # imu0: /imu/BNO085_filtered
+        # # prettier-ignore
+        # imu0_config: [false, false, false, # x, y, z position
+        #               true, true, true, # roll, pitch, yaw
+        #               false, false, false, # x, y, z velocity
+        #               true, true, true, # roll, pitch, yaw velocity
+        #               true, true, true] # x, y, z acceleration
+        # imu0_queue_size: 5
+        # imu0_differential: false
+        # imu0_relative: false
+        # # imu0_pose_rejection_threshold: 1.5
+        # # imu0_twist_rejection_threshold: 1.5
+        # # imu0_linear_acceleration_rejection_threshold: 1.5
+        # imu0_remove_gravitational_acceleration: false
+
+        #! RESET TO imu1 IF USING TWO IMUS, also /imu/LSM6DSOX_filtered uses filtered data, _data is raw
+        # # IMU - LSM6DSOX
+        #* Adapts for gravity
+        # Orientation, angular velocity, linear acceleration
+        imu0: /imu/LSM6DSOX_filtered
+        # prettier-ignore
+        imu0_config: [false, false, false, # x, y, z position
+                      true, true, true, # roll, pitch, yaw
+                      false, false, false, # x, y, z velocity
+                      false, false, false, # roll, pitch, yaw velocity
+                      false, false, false] # x, y, z acceleration
+        imu0_queue_size: 100
+        imu0_differential: true
+        imu0_relative: true
+        # imu0_pose_rejection_threshold: 1.5
+        # imu0_twist_rejection_threshold: 1.5
+        # imu0_linear_acceleration_rejection_threshold: 1.5
+        imu0_remove_gravitational_acceleration: true
+        # initial_estimate_covariance: [1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6]
+        
+        # # GPS input
+        # odom1: /odometry/gps
+        # # prettier-ignore
+        # odom1_config: [true, true, false, # !x, !y, z position
+        #                  false, false, false, # roll, pitch, yaw
+        #                  false, false, false, # x, y, z velocity
+        #                  false, false, false, # roll, pitch, yaw velocity
+        #                  false, false, false] # x, y, z acceleration
+        # odom1_queue_size: 10
+        # odom1_differential: false
+        # odom1_relative: false
+        # initial_estimate_covariance: [1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6]
+
+### NAVSAT TRANSFORM ###
+navsat_transform:
+    ros__parameters:
+        use_sim_time: false
+        frequency: 0.2
+        delay: 5.0
+        magnetic_declination_radians: 0.1315 # Detroit, MI
+        yaw_offset: 1.570796327 # Uncomment if IMU reads 0 facing magnetic north, not east
+        zero_altitude: true
+        broadcast_cartesian_transform: false
+        publish_filtered_gps: true
+        use_odometry_yaw: false # Using yaw from GPS heading
+        wait_for_datum: false
