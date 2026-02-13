@@ -2,11 +2,6 @@
 
 A comprehensive ROS2 Navigation2 (Nav2) integration package for the Schoolbus autonomous ground vehicle. This package provides a complete navigation stack including SLAM, localization, path planning, and collision avoidance using a Velodyne 3D LiDAR, IMU sensors, and robot-specific configurations.
 
-**ROS2 Distribution:** Jazzy  
-**Ubuntu Version:** 24.04  
-**License:** MIT  
-**Maintainer:** Devson Butani (<dbutani@ltu.edu>)
-
 ## Overview
 
 nav2_schoolbus is a launch and configuration package that assembles the Nav2 navigation framework with additional perception and state estimation nodes for the Schoolbus robot. It enables autonomous navigation through:
@@ -275,10 +270,7 @@ nav.goToPose(goal)
 "
 ```
 
-## References
+## Maintainer and License
 
-- [Nav2 Documentation](https://navigation.ros.org/)
-- [SLAM Toolbox](https://github.com/StanleyInnovation/slam_toolbox)
-- [KISS-ICP](https://github.com/PRBonn/kiss-icp)
-- [Robot Localization](https://docs.ros.org/en/jazzy/p/robot_localization/)
-- [ROS2 Jazzy Documentation](https://docs.ros.org/en/jazzy/)
+**License:** MIT  
+**Maintainer:** Devson Butani (<dbutani@ltu.edu>)
