@@ -21,6 +21,7 @@ from launch.actions import (
     GroupAction,
     IncludeLaunchDescription,
     SetEnvironmentVariable,
+    TimerAction,
 )
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -167,6 +168,15 @@ def generate_launch_description():
                     "container_name": "nav2_container",
                 }.items(),
             ),
+        ]
+    )
+
+    # Delay Nav2 navigation nodes until SLAM has had time to publish the map->odom TF.
+    # SLAM Toolbox activates in ~3 s but needs several LiDAR sweeps before it publishes TF;
+    # 15 s gives comfortable margin on a loaded Raspberry Pi.
+    delayed_navigation_cmd = TimerAction(
+        period=15.0,
+        actions=[
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(os.path.join(launch_dir, "navigation_launch.py")),
                 launch_arguments={
@@ -178,8 +188,8 @@ def generate_launch_description():
                     "use_respawn": use_respawn,
                     "container_name": "nav2_container",
                 }.items(),
-            ),
-        ]
+            )
+        ],
     )
 
     # Create the launch description and populate
@@ -203,5 +213,6 @@ def generate_launch_description():
 
     # Add the actions to launch all of the navigation nodes
     ld.add_action(bringup_cmd_group)
+    ld.add_action(delayed_navigation_cmd)
 
     return ld

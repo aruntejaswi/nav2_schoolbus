@@ -1,14 +1,18 @@
 import os
 
-from ament_index_python.packages import get_package_share_directory
+from ament_index_python.packages import get_package_share_directory, PackageNotFoundError
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 nav2_arg = DeclareLaunchArgument("visualize_kiss", default_value="false")
+nav2_enable_arg = DeclareLaunchArgument(
+    "nav2", default_value="true",
+    description="Set false to run sensors/odometry only (Pi-side in multi-machine mode)"
+)
 
 
 # Schoolbus Description - URDF
@@ -54,7 +58,9 @@ def launch_kiss_lidar_odometry():
         PythonLaunchDescriptionSource(os.path.join(get_package_share_directory("kiss_icp"), "launch/odometry.launch.py")),
         launch_arguments={
             'visualize': LaunchConfiguration("visualize_kiss"),
-            # 'pointcloud_topic': '/velodyne_points',
+            'topic': '/velodyne_points',
+            'lidar_odom_frame': 'odom',
+            'base_frame': 'base_footprint',
         }.items()
     )
 
@@ -137,7 +143,7 @@ def launch_robot_localization_gps():
 def launch_nav2_bringup():
     return IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(get_package_share_directory("nav2_schoolbus"), "bringup_launch.py")),
-        # condition=IfCondition(LaunchConfiguration("nav2"))
+        condition=IfCondition(LaunchConfiguration("nav2"))
     )
 
 def launch_masker():
@@ -179,14 +185,20 @@ def routecam():
         PythonLaunchDescriptionSource(os.path.join(get_package_share_directory("routecam_ros2"), "routecam.launch.py")))
         
 def routecam_nav2():
+    try:
+        pkg = get_package_share_directory("routecam_nav2")
+    except PackageNotFoundError:
+        return LogInfo(msg="routecam_nav2 not installed, skipping")
     return IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(get_package_share_directory("routecam_nav2"), "routecam.launch.py")))
+        PythonLaunchDescriptionSource(os.path.join(pkg, "routecam.launch.py")),
+        condition=IfCondition(LaunchConfiguration("nav2")))
     
 
 
 def generate_launch_description():
     ld = LaunchDescription([
         nav2_arg,
+        nav2_enable_arg,
         launch_pointcloud_to_scan(),
         launch_schoolbus_description(),
         imu_filter_madgwick_LSM6DSOX(),

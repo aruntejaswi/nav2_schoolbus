@@ -2,7 +2,7 @@
 ekf_filter_node_odom:
     ros__parameters:
         use_sim_time: false
-        frequency: 30.0
+        frequency: 15.0
         sensor_timeout: 0.2
         two_d_mode: true
         transform_timeout: 0.2
@@ -77,7 +77,7 @@ ekf_filter_node_odom:
                       false, false, false] # x, y, z acceleration
         imu0_queue_size: 100
         imu0_differential: true
-        imu0_relative: true
+        imu0_relative: false
         # imu0_pose_rejection_threshold: 1.5
         # imu0_twist_rejection_threshold: 1.5
         # imu0_linear_acceleration_rejection_threshold: 1.5
@@ -88,7 +88,7 @@ ekf_filter_node_odom:
 ekf_filter_node_map:
     ros__parameters:
         use_sim_time: false
-        frequency: 30.0
+        frequency: 15.0
         sensor_timeout: 0.2
         two_d_mode: true
         transform_timeout: 0.2
@@ -163,7 +163,7 @@ ekf_filter_node_map:
                       false, false, false] # x, y, z acceleration
         imu0_queue_size: 100
         imu0_differential: true
-        imu0_relative: true
+        imu0_relative: false
         # imu0_pose_rejection_threshold: 1.5
         # imu0_twist_rejection_threshold: 1.5
         # imu0_linear_acceleration_rejection_threshold: 1.5

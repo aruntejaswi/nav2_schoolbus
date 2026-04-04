@@ -11,7 +11,7 @@ local_costmap:
             height: 20
             resolution: 0.1
             robot_radius: 0.65
-            plugins: ["stvl_layer", "denoise_layer", "obstacle_layer", "inflation_layer", "line_stvl_layer"]
+            plugins: ["obstacle_layer", "inflation_layer"]
             # static_layer:
             #     plugin: "nav2_costmap_2d::StaticLayer"
             #     enabled: true
@@ -78,7 +78,7 @@ local_costmap:
             inflation_layer:
                 plugin: "nav2_costmap_2d::InflationLayer"
                 cost_scaling_factor: 3.0
-                inflation_radius: 0.45 #0.3
+                inflation_radius: 0.70
             # white_line_layer:
             #     plugin: "nav2_costmap_2d::StaticLayer"
             #     map_topic: /white_line_map
@@ -136,7 +136,7 @@ global_costmap:
             robot_radius: 0.65
             resolution: 0.2
             track_unknown_space: true
-            plugins: ["denoise_layer", "obstacle_layer", "inflation_layer","line_stvl_layer"]
+            plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
             static_layer:
                 plugin: "nav2_costmap_2d::StaticLayer"
                 enabled: true
@@ -149,7 +149,7 @@ global_costmap:
             inflation_layer:
                 plugin: "nav2_costmap_2d::InflationLayer"
                 cost_scaling_factor: 3.0
-                inflation_radius: 0.45 #0.2
+                inflation_radius: 0.70
             obstacle_layer:
                 plugin: "nav2_costmap_2d::ObstacleLayer"
                 enabled: true
@@ -366,7 +366,7 @@ bt_navigator:
     ros__parameters:
         global_frame: map
         robot_base_frame: base_footprint
-        odom_topic: /odometry/global
+        odom_topic: /odometry/local
         bt_loop_duration: 10
         default_server_timeout: 20
         wait_for_service_timeout: 1000
@@ -672,7 +672,7 @@ collision_monitor:
             visualize: False
             enabled: True
         observation_sources: ["pointcloud"]
-        scan:
+        pointcloud:
             type: "pointcloud"
             topic: "/velodyne_points"
             min_height: 0.15
