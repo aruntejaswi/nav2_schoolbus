@@ -47,41 +47,36 @@ ekf_filter_node_odom:
         # imu0_remove_gravitational_acceleration: true
 
         # # # IMU - BNO085
-        # #* Adapts for gravity
-        # # Orientation, angular velocity, linear acceleration
-        # imu0: /imu/BNO085_filtered
-        # # prettier-ignore
-        # imu0_config: [false, false, false, # x, y, z position
-        #               true, true, true, # roll, pitch, yaw
-        #               false, false, false, # x, y, z velocity
-        #               true, true, true, # roll, pitch, yaw velocity
-        #               true, true, true] # x, y, z acceleration
-        # imu0_queue_size: 200
-        # imu0_differential: false
-        # imu0_relative: false
-        # # imu0_pose_rejection_threshold: 1.5
-        # # imu0_twist_rejection_threshold: 1.5
-        # # imu0_linear_acceleration_rejection_threshold: 1.5
-        # imu0_remove_gravitational_acceleration: false
-
-        #! RESET TO imu1 IF USING TWO IMUS, also /imu/LSM6DSOX_filtered uses filtered data, _data is raw
-        # # IMU - LSM6DSOX
-        #* Adapts for gravity
+        #* Adapts for gravity internally; use absolute orientation
         # Orientation, angular velocity, linear acceleration
-        imu0: /imu/LSM6DSOX_filtered
+        imu0: /imu/BNO085_filtered
         # prettier-ignore
         imu0_config: [false, false, false, # x, y, z position
                       true, true, true, # roll, pitch, yaw
                       false, false, false, # x, y, z velocity
-                      false, false, false, # roll, pitch, yaw velocity
-                      false, false, false] # x, y, z acceleration
-        imu0_queue_size: 100
-        imu0_differential: true
+                      true, true, true, # roll, pitch, yaw velocity
+                      true, true, true] # x, y, z acceleration
+        imu0_queue_size: 200
+        imu0_differential: false
         imu0_relative: false
         # imu0_pose_rejection_threshold: 1.5
         # imu0_twist_rejection_threshold: 1.5
         # imu0_linear_acceleration_rejection_threshold: 1.5
-        imu0_remove_gravitational_acceleration: true
+        imu0_remove_gravitational_acceleration: false
+
+        #! RESET TO imu1 IF USING TWO IMUS
+        # # IMU - LSM6DSOX (no serial publisher configured — use BNO085 instead)
+        # imu0: /imu/LSM6DSOX_filtered
+        # # prettier-ignore
+        # imu0_config: [false, false, false, # x, y, z position
+        #               true, true, true, # roll, pitch, yaw
+        #               false, false, false, # x, y, z velocity
+        #               false, false, false, # roll, pitch, yaw velocity
+        #               false, false, false] # x, y, z acceleration
+        # imu0_queue_size: 100
+        # imu0_differential: true
+        # imu0_relative: false
+        # imu0_remove_gravitational_acceleration: true
         # initial_estimate_covariance: [1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6]
 
 ### GLOBAL EKF ###

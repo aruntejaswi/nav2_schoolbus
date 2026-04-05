@@ -65,6 +65,19 @@ def launch_kiss_lidar_odometry():
         }.items()
     )
 
+def launch_imu_serial_BNO085():
+    return IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(get_package_share_directory("imu_serial_to_ros_publisher"),
+                         "launch/imu_publisher.launch.py")
+        ),
+        launch_arguments={
+            'serial_port': '/dev/tty_BNO085',
+            'topic': '/imu/BNO085_data',
+            'frame_id': 'imu_link',
+        }.items()
+    )
+
 def imu_filter_madgwick_BNO085():
     imu_filter_yaml = os.path.join(get_package_share_directory("nav2_schoolbus"), "config", "imu_filter_BNO085.yaml")
     return Node(
@@ -202,7 +215,8 @@ def generate_launch_description():
         nav2_enable_arg,
         launch_pointcloud_to_scan(),
         launch_schoolbus_description(),
-        imu_filter_madgwick_LSM6DSOX(),
+        launch_imu_serial_BNO085(),
+        imu_filter_madgwick_BNO085(),
         launch_kiss_lidar_odometry(),
         launch_robot_localization_local(),
         # launch_robot_localization_global(),
