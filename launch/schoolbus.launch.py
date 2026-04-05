@@ -61,6 +61,7 @@ def launch_kiss_lidar_odometry():
             'topic': '/velodyne_points',
             'lidar_odom_frame': 'odom',
             'base_frame': 'base_footprint',
+            'publish_odom_tf': 'false',  # EKF publishes odom->base_footprint; KISS-ICP inverts it causing TF loop
         }.items()
     )
 
