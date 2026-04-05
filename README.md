@@ -270,6 +270,117 @@ nav.goToPose(goal)
 "
 ```
 
+---
+
+## Quick Start: Multi-Machine Setup (Validated Configuration)
+
+This section documents the working configuration as of April 2026. The robot Pi is too resource-constrained to run SLAM + Nav2 + sensors simultaneously, so the stack is split across two machines over wired ethernet.
+
+### Hardware
+
+| Machine | Role | IP | User |
+|---------|------|----|------|
+| Raspberry Pi (`igvcrpi`) | Velodyne LiDAR + odometry | 192.168.0.3 | pi |
+| Robot laptop (`actor-2`) | SLAM Toolbox + Nav2 | 192.168.0.22 | dev |
+
+**Prerequisites:**
+- Velodyne VLP-16 spinning and connected to Pi via ethernet
+- Pi and laptop connected by wired ethernet (on same 192.168.0.x subnet)
+- `ROS_DOMAIN_ID=99` set in Pi's `~/.bashrc` (already configured)
+- Both machines sourced: `/opt/ros/jazzy/setup.bash` + `~/ros2_ws/install/setup.bash`
+
+---
+
+### Startup Sequence
+
+#### Step 1 — Pi: Velodyne sensor (`sensor_ws`)
+```bash
+ssh pi@192.168.0.3
+source /opt/ros/jazzy/setup.bash && source ~/sensor_ws/install/setup.bash
+ros2 launch velodyne velodyne-all-nodes-VLP16-launch.py
+```
+Verify: `ros2 topic hz /velodyne_points` → ~10 Hz
+
+#### Step 2 — Pi: Odometry stack (`ros2_ws`)
+```bash
+ssh pi@192.168.0.3
+source /opt/ros/jazzy/setup.bash && source ~/ros2_ws/install/setup.bash
+export ROS_DOMAIN_ID=99
+ros2 launch nav2_schoolbus schoolbus.launch.py nav2:=false
+```
+Verify after ~12s:
+- `ros2 topic hz /kiss/odometry` → ~10 Hz
+- `ros2 topic hz /odometry/local` → ~15 Hz
+
+The `nav2:=false` argument runs sensors and odometry only (no Nav2). This is the Pi-side role in the split configuration.
+
+#### Step 3 — Laptop: SLAM + Nav2
+```bash
+ssh dev@192.168.0.22
+source /opt/ros/jazzy/setup.bash && source ~/ros2_ws/install/setup.bash
+export ROS_DOMAIN_ID=99
+ros2 launch nav2_schoolbus bringup_launch.py slam:=True
+```
+Wait ~25 seconds for:
+```
+[lifecycle_manager_navigation]: Managed nodes are active
+```
+
+**Note:** Use `slam:=True` (capital T) — Python launch files evaluate booleans as Python literals.
+
+---
+
+### SLAM Mapping Workflow
+
+1. Complete the startup sequence above
+2. Open RViz on the laptop:
+   ```bash
+   LIBGL_ALWAYS_SOFTWARE=1 rviz2
+   ```
+3. In RViz:
+   - Add **LaserScan** → `/velodyne_scan` → set Reliability to **Best Effort**, Size: `0.05`
+   - Add **Map** → `/map` → set Reliability to **Best Effort**
+   - Set **Fixed Frame** to `map`
+4. Drive the robot slowly through the environment using the RC joystick
+5. Drive a **loop** back to the start — this lets SLAM close the loop and correct drift
+6. Save the map immediately when it looks good:
+   ```bash
+   source /opt/ros/jazzy/setup.bash && source ~/ros2_ws/install/setup.bash
+   export ROS_DOMAIN_ID=99
+   ros2 run nav2_map_server map_saver_cli -f ~/my_map
+   ```
+   This produces `my_map.pgm` and `my_map.yaml`.
+
+**Tips:**
+- Drive slowly (~0.5 m/s or less)
+- Save immediately when the map looks good — SLAM keeps running and can distort the map if left idle
+- KISS-ICP works best outdoors or in corridors with clear wall features. Open rooms with few features cause drift.
+
+#### KISS-ICP Indoor Tuning
+
+For indoor use, copy `config/kiss_icp_indoor.yaml` over the default KISS-ICP config on the Pi:
+```bash
+cp ~/ros2_ws/src/nav2_schoolbus/config/kiss_icp_indoor.yaml \
+   ~/ros2_ws/src/kiss-icp/ros/config/config.yaml
+```
+This sets `max_range: 10m`, `min_range: 0.5m`, `voxel_size: 0.1m` — critical for stable indoor odometry. Without this, KISS-ICP uses 1m voxels (designed for outdoor 100m range) and produces unusable odometry indoors.
+
+---
+
+### Known Issues and Fixes Applied
+
+| Issue | Fix | File |
+|-------|-----|------|
+| Nav2 activates before KISS-ICP publishes odom TF → 60s timeout | `TimerAction(15s)` delay before navigation_launch.py | `launch/bringup_launch.py` |
+| `bt_navigator` looking for `/odometry/global` (global EKF not running) | Changed `odom_topic` to `/odometry/local` | `config/nav2_params.yaml` |
+| `inflation_radius` ERROR (0.45 < inscribed radius 0.647) | Raised to 0.70 in local + global costmaps | `config/nav2_params.yaml` |
+| `collision_monitor` source name mismatch (`scan` vs `pointcloud`) | Renamed source block to match `observation_sources` | `config/nav2_params.yaml` |
+| EKF rate failures at 30Hz on overloaded Pi | Reduced frequency to 15Hz | `config/ekf.yaml` |
+| KISS-ICP publishes inverted TF (`base_footprint→odom`) conflicting with EKF | Added `publish_odom_tf: false` to KISS-ICP launch args | `launch/schoolbus.launch.py` |
+| RViz `/velodyne_scan` invisible | Set Reliability to **Best Effort** in RViz display settings | (RViz config) |
+
+---
+
 ## Maintainer and License
 
 **License:** MIT  
