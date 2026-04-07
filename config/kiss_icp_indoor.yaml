@@ -6,12 +6,12 @@ kiss_icp_node:
       min_range: 0.5
 
     mapping:
-      voxel_size: 0.1
-      max_points_per_voxel: 20
+      voxel_size: 0.08
+      max_points_per_voxel: 40
 
     adaptive_threshold:
-      initial_threshold: 0.5
-      min_motion_th: 0.05
+      initial_threshold: 0.3
+      min_motion_th: 0.02
 
     registration:
       max_num_iterations: 500

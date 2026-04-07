@@ -78,7 +78,7 @@ local_costmap:
             inflation_layer:
                 plugin: "nav2_costmap_2d::InflationLayer"
                 cost_scaling_factor: 3.0
-                inflation_radius: 0.70
+                inflation_radius: 0.35
             # white_line_layer:
             #     plugin: "nav2_costmap_2d::StaticLayer"
             #     map_topic: /white_line_map
@@ -149,7 +149,7 @@ global_costmap:
             inflation_layer:
                 plugin: "nav2_costmap_2d::InflationLayer"
                 cost_scaling_factor: 3.0
-                inflation_radius: 0.70
+                inflation_radius: 0.35
             obstacle_layer:
                 plugin: "nav2_costmap_2d::ObstacleLayer"
                 enabled: true
@@ -223,6 +223,7 @@ slam_toolbox:
         map_frame: map
         base_frame: base_footprint
         scan_topic: /velodyne_scan
+        odom_topic: /odometry/local
         use_map_saver: false
         mode: mapping #localization
 
@@ -236,12 +237,12 @@ slam_toolbox:
         debug_logging: false
         throttle_scans: 1
         transform_publish_period: 0.05 #if 0 never publishes odometry
-        map_update_interval: 5.0
+        map_update_interval: 2.0
         resolution: 0.05
         restamp_tf: true
         min_laser_range: 0.5
         max_laser_range: 10.0 #for rastering images
-        minimum_time_interval: 0.5
+        minimum_time_interval: 0.1
         transform_timeout: 0.5
         tf_buffer_duration: 30.0
         stack_size_to_use: 40000000 #// program needs a larger stack size to serialize large maps
@@ -250,15 +251,15 @@ slam_toolbox:
         # General Parameters
         use_scan_matching: true
         use_scan_barycenter: true
-        minimum_travel_distance: 0.5
-        minimum_travel_heading: 0.5
-        scan_buffer_size: 10
+        minimum_travel_distance: 0.05
+        minimum_travel_heading: 0.05
+        scan_buffer_size: 20
         scan_buffer_maximum_scan_distance: 10.0
-        link_match_minimum_response_fine: 0.1
+        link_match_minimum_response_fine: 0.45
         link_scan_maximum_distance: 1.5
-        loop_search_maximum_distance: 3.0
+        loop_search_maximum_distance: 6.0
         do_loop_closing: true
-        loop_match_minimum_chain_size: 10
+        loop_match_minimum_chain_size: 5
         loop_match_maximum_variance_coarse: 3.0
         loop_match_minimum_response_coarse: 0.35
         loop_match_minimum_response_fine: 0.45
@@ -278,13 +279,13 @@ slam_toolbox:
         angle_variance_penalty: 1.0
 
         fine_search_angle_offset: 0.00349
-        coarse_search_angle_offset: 0.349
+        coarse_search_angle_offset: 0.5
         coarse_angle_resolution: 0.0349
         minimum_angle_penalty: 0.9
         minimum_distance_penalty: 0.5
         use_response_expansion: true
-        min_pass_through: 2
-        occupancy_threshold: 0.1
+        min_pass_through: 1
+        occupancy_threshold: 0.25
 
         # # Plugin params
         # solver_plugin: solver_plugins::CeresSolver
@@ -362,6 +363,35 @@ slam_toolbox:
         # min_pass_through: 2
         # occupancy_threshold: 0.1
 
+amcl:
+    ros__parameters:
+        use_sim_time: False
+        alpha1: 0.2
+        alpha2: 0.2
+        alpha3: 0.2
+        alpha4: 0.2
+        alpha5: 0.2
+        base_frame_id: "base_footprint"
+        global_frame_id: "map"
+        laser_max_range: 10.0
+        laser_min_range: 0.5
+        laser_model_type: "likelihood_field"
+        max_beams: 60
+        max_particles: 2000
+        min_particles: 500
+        odom_frame_id: "odom"
+        robot_model_type: "nav2_amcl::DifferentialMotionModel"
+        tf_broadcast: true
+        transform_tolerance: 1.0
+        scan_topic: /velodyne_scan
+        set_initial_pose: true
+        initial_pose_x: 0.0
+        initial_pose_y: 0.0
+        initial_pose_z: 0.0
+        initial_pose_yaw: 0.0
+        always_reset_initial_pose: false
+        first_map_only: false
+
 bt_navigator:
     ros__parameters:
         global_frame: map
@@ -376,6 +406,9 @@ bt_navigator:
             plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
         navigate_through_poses:
             plugin: "nav2_bt_navigator::NavigateThroughPosesNavigator"
+        # Spin-free BT: robot cannot rotate in place (Ackermann)
+        default_nav_to_pose_bt_xml: "/opt/ros/jazzy/share/nav2_bt_navigator/behavior_trees/navigate_w_replanning_only_if_path_becomes_invalid.xml"
+        default_nav_through_poses_bt_xml: "/opt/ros/jazzy/share/nav2_bt_navigator/behavior_trees/navigate_w_replanning_only_if_path_becomes_invalid.xml"
         error_code_names:
             - compute_path_error_code
             - follow_path_error_code
@@ -525,47 +558,29 @@ controller_server:
             xy_goal_tolerance: 0.25
             yaw_goal_tolerance: 0.25
             stateful: True
-        # DWB controller parameters
+        # Regulated Pure Pursuit — required for Ackermann (no rotate-in-place)
         FollowPath:
-            plugin: "dwb_core::DWBLocalPlanner"
-            debug_trajectory_details: True
-            min_vel_x: 0.0
-            min_vel_y: 0.0
-            max_vel_x: 2.5
-            max_vel_y: 0.0
-            max_vel_theta: 1.0
-            min_speed_xy: 0.0
-            max_speed_xy: 2.5
-            min_speed_theta: 0.0
-            acc_lim_x: 2.5
-            acc_lim_y: 0.0
-            acc_lim_theta: 3.2
-            decel_lim_x: -2.5
-            decel_lim_y: 0.0
-            decel_lim_theta: -3.2
-            vx_samples: 20
-            vy_samples: 5
-            vtheta_samples: 20
-            sim_time: 1.7
-            linear_granularity: 0.05
-            angular_granularity: 0.025
-            transform_tolerance: 0.9
-            xy_goal_tolerance: 0.25
-            trans_stopped_velocity: 0.25
-            short_circuit_trajectory_evaluation: True
-            limit_vel_cmd_in_traj: False
-            stateful: True
-            critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
-            BaseObstacle.scale: 0.02
-            PathAlign.scale: 32.0
-            GoalAlign.scale: 24.0
-            PathAlign.forward_point_distance: 0.1
-            GoalAlign.forward_point_distance: 0.1
-            PathDist.scale: 32.0
-            GoalDist.scale: 24.0
-            RotateToGoal.scale: 32.0
-            RotateToGoal.slowing_factor: 5.0
-            RotateToGoal.lookahead_time: -1.0
+            plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
+            desired_linear_vel: 1.5
+            lookahead_dist: 1.5
+            min_lookahead_dist: 0.5
+            max_lookahead_dist: 3.0
+            lookahead_time: 1.5
+            use_velocity_scaled_lookahead_dist: false
+            min_approach_linear_velocity: 1.0
+            approach_velocity_scaling_dist: 1.0
+            use_collision_detection: false
+            use_regulated_linear_velocity_scaling: true
+            use_fixed_curvature_lookahead: false
+            use_cost_regulated_linear_velocity_scaling: false
+            regulated_linear_scaling_min_radius: 0.9
+            regulated_linear_scaling_min_speed: 0.25
+            use_rotate_to_heading: false
+            allow_reversing: false
+            rotate_to_heading_min_angle: 0.785
+            max_angular_accel: 3.2
+            max_robot_pose_search_dist: 10.0
+            transform_tolerance: 0.2
 
 # map_saver:
 #     ros__parameters:
@@ -603,9 +618,7 @@ behavior_server:
         local_footprint_topic: local_costmap/published_footprint
         global_footprint_topic: global_costmap/published_footprint
         cycle_frequency: 10.0
-        behavior_plugins: ["spin", "backup", "drive_on_heading", "assisted_teleop", "wait"]
-        spin:
-            plugin: "nav2_behaviors::Spin"
+        behavior_plugins: ["backup", "drive_on_heading", "assisted_teleop", "wait"]  # no spin: Ackermann cannot rotate in place
         backup:
             plugin: "nav2_behaviors::BackUp"
         drive_on_heading:

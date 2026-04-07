@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
 import os
 
 from ament_index_python.packages import get_package_share_directory
@@ -29,6 +30,69 @@ from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node, PushROSNamespace
 from launch_ros.descriptions import ParameterFile
 from nav2_common.launch import ReplaceString, RewrittenYaml
+
+
+def launch_pointcloud_to_scan():
+    return Node(
+        package='pointcloud_to_laserscan',
+        executable='pointcloud_to_laserscan_node',
+        name='pointcloud_to_laserscan',
+        remappings=[
+            ('cloud_in', '/velodyne_points'),
+            ('scan', '/velodyne_scan'),
+        ],
+        parameters=[{
+            'target_frame': '3d_lidar_link',
+            'transform_tolerance': 0.2,
+            'min_height': -0.20,
+            'max_height': 0.50,
+            'angle_min': -math.pi,
+            'angle_max': math.pi,
+            'angle_increment': math.pi / 180.0,
+            'scan_time': 0.05,
+            'range_min': 0.45,
+            'range_max': 10.0,
+            'use_inf': True,
+            'inf_epsilon': 1.0
+        }],
+        arguments=['--ros-args', '--log-level', 'warn'],
+        output='screen'
+    )
+
+
+def launch_kiss_lidar_odometry():
+    kiss_icp_config = os.path.join(
+        get_package_share_directory("nav2_schoolbus"), "config", "kiss_icp_indoor.yaml"
+    )
+    return IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(get_package_share_directory("kiss_icp"), "launch/odometry.launch.py")
+        ),
+        launch_arguments={
+            'visualize': 'false',
+            'topic': '/velodyne_points',
+            'lidar_odom_frame': 'odom',
+            'base_frame': 'base_footprint',
+            'publish_odom_tf': 'false',
+            'config_file': kiss_icp_config,
+        }.items()
+    )
+
+
+def launch_robot_localization_local():
+    ekf_yaml = os.path.join(
+        get_package_share_directory("nav2_schoolbus"), "config", "ekf.yaml"
+    )
+    return Node(
+        package="robot_localization",
+        executable="ekf_node",
+        name="ekf_filter_node_odom",
+        output="screen",
+        parameters=[ekf_yaml],
+        remappings=[
+            ("odometry/filtered", "odometry/local"),
+        ],
+    )
 
 
 def generate_launch_description():
@@ -210,6 +274,11 @@ def generate_launch_description():
     ld.add_action(declare_use_respawn_cmd)
     ld.add_action(declare_log_level_cmd)
     ld.add_action(declare_use_localization_cmd)
+
+    # Odometry pipeline (moved from Pi to free CPU load)
+    ld.add_action(launch_pointcloud_to_scan())
+    ld.add_action(launch_kiss_lidar_odometry())
+    ld.add_action(launch_robot_localization_local())
 
     # Add the actions to launch all of the navigation nodes
     ld.add_action(bringup_cmd_group)

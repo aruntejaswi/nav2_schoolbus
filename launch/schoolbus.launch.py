@@ -1,3 +1,4 @@
+import math
 import os
 
 from ament_index_python.packages import get_package_share_directory, PackageNotFoundError
@@ -12,6 +13,10 @@ nav2_arg = DeclareLaunchArgument("visualize_kiss", default_value="false")
 nav2_enable_arg = DeclareLaunchArgument(
     "nav2", default_value="true",
     description="Set false to run sensors/odometry only (Pi-side in multi-machine mode)"
+)
+odometry_arg = DeclareLaunchArgument(
+    "odometry", default_value="true",
+    description="Set false when KISS-ICP/EKF/pointcloud_to_laserscan run on a separate machine (e.g. laptop)"
 )
 
 
@@ -30,6 +35,7 @@ def launch_pointcloud_to_scan():
         package='pointcloud_to_laserscan',
         executable='pointcloud_to_laserscan_node',
         name='pointcloud_to_laserscan',
+        condition=IfCondition(LaunchConfiguration("odometry")),
         remappings=[
             ('cloud_in', '/velodyne_points'),
             ('scan', '/velodyne_scan'),
@@ -37,11 +43,11 @@ def launch_pointcloud_to_scan():
         parameters=[{
             'target_frame': '3d_lidar_link',  # Usually use base link or footprint frame
             'transform_tolerance': 0.2,
-            'min_height': -1.0,
-            'max_height': 1.0,
-            'angle_min': -3.14159,    # -90 degrees
-            'angle_max': 3.14159,     # 90 degrees
-            'angle_increment': 0.0175,  # about 1 degree
+            'min_height': -0.20,             # includes horizontal beam (Z=0) needed for scan matching; ground at -0.94m in sensor frame, safely excluded
+            'max_height': 0.50,              # 1.44m above floor: clean mid-wall slice, avoids ceiling (~1.56m above sensor)
+            'angle_min': -math.pi,           # -180 degrees (exact)
+            'angle_max': math.pi,            # +180 degrees (exact)
+            'angle_increment': math.pi / 180.0,  # exact 1° — karto validates (max-min)/(n-1)==increment; 2π/360==π/180 ✓
             'scan_time': 0.05,
             'range_min': 0.45,
             'range_max': 10.0,
@@ -54,14 +60,19 @@ def launch_pointcloud_to_scan():
 
 # Direct Lidar Inertial Odometry
 def launch_kiss_lidar_odometry():
+    kiss_icp_config = os.path.join(
+        get_package_share_directory("nav2_schoolbus"), "config", "kiss_icp_indoor.yaml"
+    )
     return IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(get_package_share_directory("kiss_icp"), "launch/odometry.launch.py")),
+        condition=IfCondition(LaunchConfiguration("odometry")),
         launch_arguments={
             'visualize': LaunchConfiguration("visualize_kiss"),
             'topic': '/velodyne_points',
             'lidar_odom_frame': 'odom',
             'base_frame': 'base_footprint',
             'publish_odom_tf': 'false',  # EKF publishes odom->base_footprint; KISS-ICP inverts it causing TF loop
+            'config_file': kiss_icp_config,  # Use indoor config (10m range, 0.1m voxels); default falls back to 100m/1.0m
         }.items()
     )
 
@@ -115,6 +126,7 @@ def launch_robot_localization_local():
         package="robot_localization",
         executable="ekf_node",
         name="ekf_filter_node_odom",
+        condition=IfCondition(LaunchConfiguration("odometry")),
         output="screen",
         parameters=[ekf_yaml],
         remappings=[
@@ -213,10 +225,12 @@ def generate_launch_description():
     ld = LaunchDescription([
         nav2_arg,
         nav2_enable_arg,
+        odometry_arg,
         launch_pointcloud_to_scan(),
         launch_schoolbus_description(),
         launch_imu_serial_BNO085(),
         imu_filter_madgwick_BNO085(),
+        imu_filter_madgwick_LSM6DSOX(),
         launch_kiss_lidar_odometry(),
         launch_robot_localization_local(),
         # launch_robot_localization_global(),
