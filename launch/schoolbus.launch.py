@@ -43,8 +43,8 @@ def launch_pointcloud_to_scan():
         parameters=[{
             'target_frame': '3d_lidar_link',  # Usually use base link or footprint frame
             'transform_tolerance': 0.2,
-            'min_height': -0.20,             # includes horizontal beam (Z=0) needed for scan matching; ground at -0.94m in sensor frame, safely excluded
-            'max_height': 0.50,              # 1.44m above floor: clean mid-wall slice, avoids ceiling (~1.56m above sensor)
+            'min_height': -0.05,             # tight band around horizontal beam; ground at -0.94m safely excluded
+            'max_height': 0.20,              # 25cm slice (~0.89-1.14m above floor): clean mid-wall, avoids vertical feature spread
             'angle_min': -math.pi,           # -180 degrees (exact)
             'angle_max': math.pi,            # +180 degrees (exact)
             'angle_increment': math.pi / 180.0,  # exact 1° — karto validates (max-min)/(n-1)==increment; 2π/360==π/180 ✓

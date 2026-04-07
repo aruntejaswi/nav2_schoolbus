@@ -44,8 +44,8 @@ def launch_pointcloud_to_scan():
         parameters=[{
             'target_frame': '3d_lidar_link',
             'transform_tolerance': 0.2,
-            'min_height': -0.20,
-            'max_height': 0.50,
+            'min_height': -0.05,
+            'max_height': 0.20,
             'angle_min': -math.pi,
             'angle_max': math.pi,
             'angle_increment': math.pi / 180.0,

@@ -94,15 +94,16 @@ You should see: `average rate: 10.xxx` — the LiDAR publishing 10 scans per sec
 ssh pi@192.168.0.3
 source /opt/ros/jazzy/setup.bash && source ~/ros2_ws/install/setup.bash
 export ROS_DOMAIN_ID=99
-ros2 launch nav2_schoolbus schoolbus.launch.py nav2:=false
+ros2 launch nav2_schoolbus schoolbus.launch.py nav2:=false odometry:=false
 ```
 
+> **Why `odometry:=false`?** KISS-ICP and EKF now run on the laptop to reduce Pi
+> CPU load. If you omit this flag, the Pi will also run odometry, creating
+> duplicate TF publishers that corrupt the SLAM map.
+
 This starts:
-- `pointcloud_to_laserscan` — converts the 3D LiDAR cloud into a 2D laser scan
 - `imu_serial_to_ros_publisher` — reads the BNO085 IMU from the serial port
 - `imu_filter_madgwick` — filters raw IMU data into clean orientation estimates
-- `kiss_icp` — LiDAR odometry engine
-- `robot_localization (EKF)` — fuses LiDAR odometry + IMU
 - `robot_state_publisher` — publishes the robot's physical shape (URDF) to the TF tree
 
 **Verify it worked** (~15 seconds after launch, in a new Pi terminal):
@@ -112,13 +113,19 @@ source /opt/ros/jazzy/setup.bash && source ~/ros2_ws/install/setup.bash
 
 ros2 topic hz /imu/BNO085_data       # Should show ~100 Hz
 ros2 topic hz /imu/BNO085_filtered   # Should show ~100 Hz
-ros2 topic hz /kiss/odometry         # Should show ~10 Hz
-ros2 topic hz /odometry/local        # Should show ~15 Hz
 ros2 topic info /tf_static            # Should show Publisher count: 3
 ```
 
 If `/tf_static` shows `Publisher count: 0`, the robot description failed to load.
 If `/imu/BNO085_data` shows no data, the IMU serial port may be disconnected.
+
+**Check Pi CPU load:**
+```bash
+top -bn1 | head -5
+```
+With `odometry:=false`, CPU should stay well below 100%. If it's high, check for
+stale processes from a previous session: `pgrep -a 'kiss_icp|ekf_node|pointcloud'`
+and kill them with `kill -9 <PID>`.
 
 ---
 
@@ -172,14 +179,22 @@ ssh dev@192.168.0.22
 source /opt/ros/jazzy/setup.bash && source ~/ros2_ws/install/setup.bash
 export ROS_DOMAIN_ID=99
 
+ros2 topic hz /kiss/odometry         # Should show ~10 Hz (runs on laptop now)
+ros2 topic hz /odometry/local        # Should show ~15 Hz (runs on laptop now)
 ros2 lifecycle get /slam_toolbox       # Should show: active [3]
 ros2 lifecycle get /controller_server  # Should show: active [3]
 ros2 lifecycle get /planner_server     # Should show: active [3]
 ros2 lifecycle get /bt_navigator       # Should show: active [3]
 ```
 
-All four must show `active [3]`. If any show `inactive [2]` or `unconfigured [1]`,
-see the Troubleshooting section below.
+All four lifecycle nodes must show `active [3]`. If any show `inactive [2]` or
+`unconfigured [1]`, see the Troubleshooting section below.
+
+**Check for duplicate nodes** (critical — duplicates corrupt SLAM):
+```bash
+ros2 node list | grep -c ekf_filter_node_odom   # Must be exactly 1
+ros2 node list | grep -c kiss                    # Must be exactly 1
+```
 
 ---
 
@@ -324,16 +339,24 @@ The robot description (URDF) failed to load. Restart Step 2. Check for errors in
 3. If still nothing: power cycle the robot hardware (battery off → 10s → battery on)
 
 ### KISS-ICP odometry is erratic or slow
-The Pi may be overloaded with stale processes from a previous session. Check:
+KISS-ICP and EKF now run on the **laptop** (Step 4), not the Pi. If you see them
+on the Pi, you launched Step 2 without `odometry:=false`. Kill stale processes:
 ```bash
 ssh pi@192.168.0.3
-top   # Look for multiple kiss_icp, ekf_node, or pointcloud_to_laserscan processes
+pgrep -a 'kiss_icp|ekf_node|pointcloud_to_laserscan'
+kill -9 <PID>   # Kill any that appear
+top              # Verify CPU is back to normal
 ```
-If you see duplicates, kill them by PID:
+Then restart Step 2 with `odometry:=false`.
+
+### Pi CPU load is high
+With `odometry:=false`, the Pi should be well under 100% CPU. If it's high:
 ```bash
-kill -9 <PID>
+ssh pi@192.168.0.3
+top -bn1 | head -15    # Check what's using CPU
+ps aux --sort=-%cpu | head -10
 ```
-Then restart Step 2 cleanly.
+Kill any stale ROS processes from previous sessions, then restart cleanly.
 
 ### IMU shows "free fall" warning
 ```
@@ -352,15 +375,16 @@ Three common causes:
 ## System Architecture Summary
 
 ```
-Raspberry Pi (192.168.0.3)
-├── Velodyne LiDAR  →  /velodyne_points (3D) → /velodyne_scan (2D)
+Raspberry Pi (192.168.0.3)          — sensors + motor control only
+├── Velodyne LiDAR  →  /velodyne_points (3D)
 ├── BNO085 IMU      →  /imu/BNO085_data  →  /imu/BNO085_filtered
-├── KISS-ICP        →  /kiss/odometry
-├── EKF             →  /odometry/local  +  TF: odom→base_footprint
 ├── robot_state_publisher  →  TF: base_footprint→base_link→sensors
 └── control_tower   ←  /cmd_vel  (drives the motors)
 
-Robot Laptop (192.168.0.22)
+Robot Laptop (192.168.0.22)         — odometry + SLAM + navigation
+├── pointcloud_to_laserscan  →  /velodyne_scan (2D)
+├── KISS-ICP        →  /kiss/odometry
+├── EKF             →  /odometry/local  +  TF: odom→base_footprint
 ├── SLAM Toolbox    →  /map  +  TF: map→odom
 └── Nav2 Stack
     ├── planner_server    (plans a path to the goal)
