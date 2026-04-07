@@ -77,8 +77,8 @@ local_costmap:
                 group_connectivity_type: 8
             inflation_layer:
                 plugin: "nav2_costmap_2d::InflationLayer"
-                cost_scaling_factor: 3.0
-                inflation_radius: 0.70
+                cost_scaling_factor: 2.0
+                inflation_radius: 1.0
             # white_line_layer:
             #     plugin: "nav2_costmap_2d::StaticLayer"
             #     map_topic: /white_line_map
@@ -148,8 +148,8 @@ global_costmap:
                 group_connectivity_type: 8
             inflation_layer:
                 plugin: "nav2_costmap_2d::InflationLayer"
-                cost_scaling_factor: 3.0
-                inflation_radius: 0.70
+                cost_scaling_factor: 2.0
+                inflation_radius: 1.0
             obstacle_layer:
                 plugin: "nav2_costmap_2d::ObstacleLayer"
                 enabled: true
@@ -560,24 +560,24 @@ controller_server:
         # Regulated Pure Pursuit — required for Ackermann (no rotate-in-place)
         FollowPath:
             plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-            desired_linear_vel: 1.5
-            lookahead_dist: 1.5
-            min_lookahead_dist: 0.5
-            max_lookahead_dist: 3.0
-            lookahead_time: 1.5
-            use_velocity_scaled_lookahead_dist: false
-            min_approach_linear_velocity: 1.0
-            approach_velocity_scaling_dist: 1.0
+            desired_linear_vel: 0.3
+            lookahead_dist: 0.8
+            min_lookahead_dist: 0.3
+            max_lookahead_dist: 1.5
+            lookahead_time: 1.0
+            use_velocity_scaled_lookahead_dist: true
+            min_approach_linear_velocity: 0.1
+            approach_velocity_scaling_dist: 0.5
             use_collision_detection: false
             use_regulated_linear_velocity_scaling: true
             use_fixed_curvature_lookahead: false
             use_cost_regulated_linear_velocity_scaling: false
-            regulated_linear_scaling_min_radius: 0.9
-            regulated_linear_scaling_min_speed: 0.25
+            regulated_linear_scaling_min_radius: 0.5
+            regulated_linear_scaling_min_speed: 0.1
             use_rotate_to_heading: false
             allow_reversing: false
             rotate_to_heading_min_angle: 0.785
-            max_angular_accel: 3.2
+            max_angular_accel: 1.5
             max_robot_pose_search_dist: 10.0
             transform_tolerance: 0.2
 
@@ -651,13 +651,13 @@ velocity_smoother:
         smoothing_frequency: 20.0
         scale_velocities: True
         feedback: "OPEN_LOOP"
-        max_velocity: [2.5, 0.0, 2.0]
-        min_velocity: [-2.5, 0.0, -2.0]
-        max_accel: [2.5, 0.0, 3.2]
-        max_decel: [-2.5, 0.0, -3.2]
+        max_velocity: [0.5, 0.0, 1.0]
+        min_velocity: [-0.5, 0.0, -1.0]
+        max_accel: [0.5, 0.0, 1.5]
+        max_decel: [-1.0, 0.0, -1.5]
         odom_topic: /odometry/local
         odom_duration: 0.1
-        deadband_velocity: [0.1, 0.0, 0.1]
+        deadband_velocity: [0.02, 0.0, 0.02]
         velocity_timeout: 1.0
 
 collision_monitor:
@@ -678,7 +678,7 @@ collision_monitor:
             type: "polygon"
             action_type: "approach"
             footprint_topic: "/local_costmap/published_footprint"
-            time_before_collision: 1.2
+            time_before_collision: 2.0
             simulation_time_step: 0.1
             min_points: 6
             visualize: False
