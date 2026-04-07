@@ -60,11 +60,15 @@ def launch_pointcloud_to_scan():
 
 # Direct Lidar Inertial Odometry
 def launch_kiss_lidar_odometry():
+    try:
+        kiss_icp_share = get_package_share_directory("kiss_icp")
+    except PackageNotFoundError:
+        return LogInfo(msg="kiss_icp not installed, skipping (expected on Pi with odometry:=false)")
     kiss_icp_config = os.path.join(
         get_package_share_directory("nav2_schoolbus"), "config", "kiss_icp_indoor.yaml"
     )
     return IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(get_package_share_directory("kiss_icp"), "launch/odometry.launch.py")),
+        PythonLaunchDescriptionSource(os.path.join(kiss_icp_share, "launch/odometry.launch.py")),
         condition=IfCondition(LaunchConfiguration("odometry")),
         launch_arguments={
             'visualize': LaunchConfiguration("visualize_kiss"),
