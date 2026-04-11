@@ -239,7 +239,7 @@ def generate_launch_description():
     # SLAM Toolbox activates in ~3 s but needs several LiDAR sweeps before it publishes TF;
     # 15 s gives comfortable margin on a loaded Raspberry Pi.
     delayed_navigation_cmd = TimerAction(
-        period=15.0,
+        period=25.0,
         actions=[
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(os.path.join(launch_dir, "navigation_launch.py")),
