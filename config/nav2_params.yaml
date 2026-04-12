@@ -10,8 +10,8 @@ local_costmap:
             width: 20
             height: 20
             resolution: 0.1
-            robot_radius: 0.65
-            plugins: ["stvl_layer", "denoise_layer", "obstacle_layer", "inflation_layer", "line_stvl_layer"]
+            robot_radius: 0.35
+            plugins: ["obstacle_layer", "inflation_layer"]
             # static_layer:
             #     plugin: "nav2_costmap_2d::StaticLayer"
             #     enabled: true
@@ -22,7 +22,7 @@ local_costmap:
                 voxel_decay: 1.0
                 decay_model: 0
                 voxel_size: 0.1
-                track_unknown_space: true
+                track_unknown_space: false
                 unknown_threshold: 15
                 mark_threshold: 0
                 update_footprint_enabled: true
@@ -61,7 +61,7 @@ local_costmap:
                     data_type: PointCloud2
                     topic: /velodyne_points
                     obstacle_range: 10.0
-                    min_obstacle_height: 0.0
+                    min_obstacle_height: 0.25
                     max_obstacle_height: 1.5
                     max_obstacle_distance: 10.0
                     min_z: 0.1
@@ -77,8 +77,8 @@ local_costmap:
                 group_connectivity_type: 8
             inflation_layer:
                 plugin: "nav2_costmap_2d::InflationLayer"
-                cost_scaling_factor: 3.0
-                inflation_radius: 0.45 #0.3
+                cost_scaling_factor: 5.0
+                inflation_radius: 0.3
             # white_line_layer:
             #     plugin: "nav2_costmap_2d::StaticLayer"
             #     map_topic: /white_line_map
@@ -133,10 +133,10 @@ global_costmap:
             rolling_window: true
             width: 20
             height: 20
-            robot_radius: 0.65
+            robot_radius: 0.35
             resolution: 0.2
-            track_unknown_space: true
-            plugins: ["denoise_layer", "obstacle_layer", "inflation_layer","line_stvl_layer"]
+            track_unknown_space: false
+            plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
             static_layer:
                 plugin: "nav2_costmap_2d::StaticLayer"
                 enabled: true
@@ -148,8 +148,8 @@ global_costmap:
                 group_connectivity_type: 8
             inflation_layer:
                 plugin: "nav2_costmap_2d::InflationLayer"
-                cost_scaling_factor: 3.0
-                inflation_radius: 0.45 #0.2
+                cost_scaling_factor: 5.0
+                inflation_radius: 0.3
             obstacle_layer:
                 plugin: "nav2_costmap_2d::ObstacleLayer"
                 enabled: true
@@ -158,7 +158,7 @@ global_costmap:
                     data_type: PointCloud2
                     topic: /velodyne_points
                     obstacle_range: 20.0
-                    min_obstacle_height: 0.0
+                    min_obstacle_height: 0.25
                     max_obstacle_height: 2.0
                     max_obstacle_distance: 20.0
                     min_z: 0.1
@@ -236,52 +236,52 @@ slam_toolbox:
         debug_logging: false
         throttle_scans: 1
         transform_publish_period: 0.05 #if 0 never publishes odometry
-        map_update_interval: 5.0
-        resolution: 0.01
+        map_update_interval: 2.0
+        resolution: 0.05
         restamp_tf: true
-        min_laser_range: 0.0 #for rastering images
-        max_laser_range: 20.0 #for rastering images
-        minimum_time_interval: 0.5
-        transform_timeout: 0.5
-        tf_buffer_duration: 30.0
+        min_laser_range: 0.5
+        max_laser_range: 10.0 #for rastering images
+        minimum_time_interval: 0.2
+        transform_timeout: 1.0
+        tf_buffer_duration: 60.0
         stack_size_to_use: 40000000 #// program needs a larger stack size to serialize large maps
         enable_interactive_mode: true
 
         # General Parameters
         use_scan_matching: true
         use_scan_barycenter: true
-        minimum_travel_distance: 0.5
-        minimum_travel_heading: 0.5
-        scan_buffer_size: 10
+        minimum_travel_distance: 0.05
+        minimum_travel_heading: 0.05
+        scan_buffer_size: 15
         scan_buffer_maximum_scan_distance: 10.0
-        link_match_minimum_response_fine: 0.1
+        link_match_minimum_response_fine: 0.55
         link_scan_maximum_distance: 1.5
-        loop_search_maximum_distance: 3.0
+        loop_search_maximum_distance: 4.0
         do_loop_closing: true
         loop_match_minimum_chain_size: 10
         loop_match_maximum_variance_coarse: 3.0
         loop_match_minimum_response_coarse: 0.35
-        loop_match_minimum_response_fine: 0.45
+        loop_match_minimum_response_fine: 0.55
 
         # Correlation Parameters - Correlation Parameters
-        correlation_search_space_dimension: 0.5
+        correlation_search_space_dimension: 0.6
         correlation_search_space_resolution: 0.01
         correlation_search_space_smear_deviation: 0.1
 
         # Correlation Parameters - Loop Closure Parameters
-        loop_search_space_dimension: 8.0
-        loop_search_space_resolution: 0.05
+        loop_search_space_dimension: 4.0
+        loop_search_space_resolution: 0.03
         loop_search_space_smear_deviation: 0.03
 
         # Scan Matcher Parameters
-        distance_variance_penalty: 0.5
-        angle_variance_penalty: 1.0
+        distance_variance_penalty: 0.8
+        angle_variance_penalty: 1.2
 
-        fine_search_angle_offset: 0.00349
+        fine_search_angle_offset: 0.00873
         coarse_search_angle_offset: 0.349
         coarse_angle_resolution: 0.0349
         minimum_angle_penalty: 0.9
-        minimum_distance_penalty: 0.5
+        minimum_distance_penalty: 0.7
         use_response_expansion: true
         min_pass_through: 2
         occupancy_threshold: 0.1
@@ -362,11 +362,40 @@ slam_toolbox:
         # min_pass_through: 2
         # occupancy_threshold: 0.1
 
+amcl:
+    ros__parameters:
+        use_sim_time: False
+        alpha1: 0.2
+        alpha2: 0.2
+        alpha3: 0.2
+        alpha4: 0.2
+        alpha5: 0.2
+        base_frame_id: "base_footprint"
+        global_frame_id: "map"
+        laser_max_range: 10.0
+        laser_min_range: 0.5
+        laser_model_type: "likelihood_field"
+        max_beams: 60
+        max_particles: 2000
+        min_particles: 500
+        odom_frame_id: "odom"
+        robot_model_type: "nav2_amcl::DifferentialMotionModel"
+        tf_broadcast: true
+        transform_tolerance: 1.0
+        scan_topic: /velodyne_scan
+        set_initial_pose: true
+        initial_pose_x: 0.0
+        initial_pose_y: 0.0
+        initial_pose_z: 0.0
+        initial_pose_yaw: 0.0
+        always_reset_initial_pose: false
+        first_map_only: false
+
 bt_navigator:
     ros__parameters:
         global_frame: map
         robot_base_frame: base_footprint
-        odom_topic: /odometry/global
+        odom_topic: /odometry/local
         bt_loop_duration: 10
         default_server_timeout: 20
         wait_for_service_timeout: 1000
@@ -376,6 +405,9 @@ bt_navigator:
             plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
         navigate_through_poses:
             plugin: "nav2_bt_navigator::NavigateThroughPosesNavigator"
+        # Spin-free BT: robot cannot rotate in place (Ackermann)
+        default_nav_to_pose_bt_xml: "/opt/ros/jazzy/share/nav2_bt_navigator/behavior_trees/navigate_w_replanning_only_if_path_becomes_invalid.xml"
+        default_nav_through_poses_bt_xml: "/opt/ros/jazzy/share/nav2_bt_navigator/behavior_trees/navigate_w_replanning_only_if_path_becomes_invalid.xml"
         error_code_names:
             - compute_path_error_code
             - follow_path_error_code
@@ -397,7 +429,7 @@ bt_navigator:
 #         progress_checker:
 #             plugin: "nav2_controller::SimpleProgressChecker"
 #             required_movement_radius: 0.5
-#             movement_time_allowance: 10.0
+#             movement_time_allowance: 20.0
 #         # Goal checker parameters
 #         #precise_goal_checker:
 #         #  plugin: "nav2_controller::SimpleGoalChecker"
@@ -407,8 +439,8 @@ bt_navigator:
 #         general_goal_checker:
 #             stateful: True
 #             plugin: "nav2_controller::SimpleGoalChecker"
-#             xy_goal_tolerance: 0.25
-#             yaw_goal_tolerance: 0.25
+#             xy_goal_tolerance: 0.5
+#             yaw_goal_tolerance: 0.7
 #         FollowPath:
 #             plugin: "nav2_mppi_controller::MPPIController"
 #             time_steps: 56
@@ -518,54 +550,36 @@ controller_server:
         controller_plugins: ["FollowPath"]
         progress_checker:
             plugin: "nav2_controller::SimpleProgressChecker"
-            required_movement_radius: 0.5
-            movement_time_allowance: 10.0
+            required_movement_radius: 0.2
+            movement_time_allowance: 30.0
         goal_checker:
             plugin: "nav2_controller::SimpleGoalChecker"
-            xy_goal_tolerance: 0.25
-            yaw_goal_tolerance: 0.25
+            xy_goal_tolerance: 0.5
+            yaw_goal_tolerance: 3.14
             stateful: True
-        # DWB controller parameters
+        # Regulated Pure Pursuit — required for Ackermann (no rotate-in-place)
         FollowPath:
-            plugin: "dwb_core::DWBLocalPlanner"
-            debug_trajectory_details: True
-            min_vel_x: 0.0
-            min_vel_y: 0.0
-            max_vel_x: 2.5
-            max_vel_y: 0.0
-            max_vel_theta: 1.0
-            min_speed_xy: 0.0
-            max_speed_xy: 2.5
-            min_speed_theta: 0.0
-            acc_lim_x: 2.5
-            acc_lim_y: 0.0
-            acc_lim_theta: 3.2
-            decel_lim_x: -2.5
-            decel_lim_y: 0.0
-            decel_lim_theta: -3.2
-            vx_samples: 20
-            vy_samples: 5
-            vtheta_samples: 20
-            sim_time: 1.7
-            linear_granularity: 0.05
-            angular_granularity: 0.025
-            transform_tolerance: 0.9
-            xy_goal_tolerance: 0.25
-            trans_stopped_velocity: 0.25
-            short_circuit_trajectory_evaluation: True
-            limit_vel_cmd_in_traj: False
-            stateful: True
-            critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
-            BaseObstacle.scale: 0.02
-            PathAlign.scale: 32.0
-            GoalAlign.scale: 24.0
-            PathAlign.forward_point_distance: 0.1
-            GoalAlign.forward_point_distance: 0.1
-            PathDist.scale: 32.0
-            GoalDist.scale: 24.0
-            RotateToGoal.scale: 32.0
-            RotateToGoal.slowing_factor: 5.0
-            RotateToGoal.lookahead_time: -1.0
+            plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
+            desired_linear_vel: 0.8
+            lookahead_dist: 1.2
+            min_lookahead_dist: 0.6
+            max_lookahead_dist: 2.0
+            lookahead_time: 1.0
+            use_velocity_scaled_lookahead_dist: true
+            min_approach_linear_velocity: 0.3
+            approach_velocity_scaling_dist: 3.0
+            use_collision_detection: false
+            use_regulated_linear_velocity_scaling: true
+            use_fixed_curvature_lookahead: false
+            use_cost_regulated_linear_velocity_scaling: false
+            regulated_linear_scaling_min_radius: 0.5
+            regulated_linear_scaling_min_speed: 0.5
+            use_rotate_to_heading: false
+            allow_reversing: false
+            rotate_to_heading_min_angle: 0.785
+            max_angular_accel: 0.8
+            max_robot_pose_search_dist: 10.0
+            transform_tolerance: 0.2
 
 # map_saver:
 #     ros__parameters:
@@ -579,12 +593,55 @@ planner_server:
         expected_planner_frequency: 20.0
         planner_plugins: ["GridBased"]
         costmap_update_timeout: 1.0
+        # --- Fallback: NavFn A* 2D grid planner (not Ackermann-aware) ---
+        # Uncomment this block and comment out SmacPlannerHybrid below to revert.
+        # GridBased:
+        #     plugin: "nav2_navfn_planner::NavfnPlanner"
+        #     tolerance: 0.5
+        #     use_astar: true
+        #     allow_unknown: true
+        #     use_final_approach_orientation: true
+        # --- SmacPlannerHybrid: Hybrid A* in (x,y,theta) with Dubin primitives ---
+        # Respects minimum turning radius — emits Ackermann-feasible paths.
         GridBased:
-            plugin: "nav2_navfn_planner::NavfnPlanner"
+            plugin: "nav2_smac_planner::SmacPlannerHybrid"
+            # Planner topology
+            downsample_costmap: false
+            downsampling_factor: 1
             tolerance: 0.5
-            use_astar: true
             allow_unknown: true
-            use_final_approach_orientation: true
+            max_iterations: 1000000
+            max_on_approach_iterations: 1000
+            max_planning_time: 5.0
+            # Motion model — forward-only Dubins curves (matches RPP allow_reversing:false)
+            motion_model_for_search: "DUBIN"
+            angle_quantization_bins: 72
+            analytic_expansion_ratio: 3.5
+            analytic_expansion_max_length: 3.0
+            analytic_expansion_max_cost: 200.0
+            analytic_expansion_max_cost_override: false
+            # Kinematics — robot wheelbase 0.711m, double Ackermann, 45deg max steer
+            minimum_turning_radius: 0.75
+            reverse_penalty: 2.0
+            change_penalty: 0.0
+            non_straight_penalty: 1.2
+            cost_penalty: 2.0
+            retrospective_penalty: 0.015
+            # Built-in smoother
+            smooth_path: true
+            smoother:
+                max_iterations: 1000
+                w_smooth: 0.3
+                w_data: 0.2
+                tolerance: 1.0e-10
+                do_refinement: true
+                refinement_num: 2
+            # Heuristics / debug
+            debug_visualizations: false
+            use_quadratic_approximation: false
+            use_feasible_obstacle_heuristic: false
+            lookup_table_size: 20.0
+            cache_obstacle_heuristic: false
 
 smoother_server:
     ros__parameters:
@@ -603,9 +660,7 @@ behavior_server:
         local_footprint_topic: local_costmap/published_footprint
         global_footprint_topic: global_costmap/published_footprint
         cycle_frequency: 10.0
-        behavior_plugins: ["spin", "backup", "drive_on_heading", "assisted_teleop", "wait"]
-        spin:
-            plugin: "nav2_behaviors::Spin"
+        behavior_plugins: ["backup", "drive_on_heading", "assisted_teleop", "wait"]  # no spin: Ackermann cannot rotate in place
         backup:
             plugin: "nav2_behaviors::BackUp"
         drive_on_heading:
@@ -639,14 +694,14 @@ velocity_smoother:
         smoothing_frequency: 20.0
         scale_velocities: True
         feedback: "OPEN_LOOP"
-        max_velocity: [2.5, 0.0, 2.0]
-        min_velocity: [-2.5, 0.0, -2.0]
-        max_accel: [2.5, 0.0, 3.2]
-        max_decel: [-2.5, 0.0, -3.2]
+        max_velocity: [1.5, 0.0, 1.0]
+        min_velocity: [-1.5, 0.0, -1.0]
+        max_accel: [0.5, 0.0, 1.0]
+        max_decel: [-2.5, 0.0, -3.0]
         odom_topic: /odometry/local
         odom_duration: 0.1
-        deadband_velocity: [0.1, 0.0, 0.1]
-        velocity_timeout: 1.0
+        deadband_velocity: [0.02, 0.0, 0.02]
+        velocity_timeout: 0.1
 
 collision_monitor:
     ros__parameters:
@@ -668,11 +723,11 @@ collision_monitor:
             footprint_topic: "/local_costmap/published_footprint"
             time_before_collision: 1.2
             simulation_time_step: 0.1
-            min_points: 6
+            min_points: 4
             visualize: False
             enabled: True
         observation_sources: ["pointcloud"]
-        scan:
+        pointcloud:
             type: "pointcloud"
             topic: "/velodyne_points"
             min_height: 0.15

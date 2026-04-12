@@ -120,12 +120,12 @@ def generate_launch_description():
             SetRemap(src="/map", dst="map"),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(slam_launch_file),
-                launch_arguments={"use_sim_time": use_sim_time}.items(),
+                launch_arguments={"use_sim_time": use_sim_time, "autostart": autostart}.items(),
                 condition=UnlessCondition(has_slam_toolbox_params),
             ),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(slam_launch_file),
-                launch_arguments={"use_sim_time": use_sim_time, "slam_params_file": params_file}.items(),
+                launch_arguments={"use_sim_time": use_sim_time, "autostart": autostart, "slam_params_file": params_file}.items(),
                 condition=IfCondition(has_slam_toolbox_params),
             ),
         ]

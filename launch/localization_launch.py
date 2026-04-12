@@ -44,7 +44,7 @@ def generate_launch_description():
     use_respawn = LaunchConfiguration('use_respawn')
     log_level = LaunchConfiguration('log_level')
 
-    lifecycle_nodes = ['map_server']
+    lifecycle_nodes = ['map_server', 'amcl']
 
     # Map fully qualified names to relative ones so the node's namespace can be prepended.
     # In case of the transforms (tf), currently, there doesn't seem to be a better alternative
@@ -145,6 +145,17 @@ def generate_launch_description():
                 respawn=use_respawn,
                 respawn_delay=2.0,
                 parameters=[configured_params, {'yaml_filename': map_yaml_file}],
+                arguments=['--ros-args', '--log-level', log_level],
+                remappings=remappings,
+            ),
+            Node(
+                package='nav2_amcl',
+                executable='amcl',
+                name='amcl',
+                output='screen',
+                respawn=use_respawn,
+                respawn_delay=2.0,
+                parameters=[configured_params],
                 arguments=['--ros-args', '--log-level', log_level],
                 remappings=remappings,
             ),

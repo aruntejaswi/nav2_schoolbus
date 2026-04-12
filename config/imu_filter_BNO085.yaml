@@ -1,7 +1,7 @@
-imu_filter:
+imu_filter_madgwick:
   ros__parameters:
     stateless: false
-    use_mag: true
+    use_mag: false  # BNO085 does internal mag fusion; no separate /imu/mag topic published
     publish_tf: false
     reverse_tf: false
     fixed_frame: "odom"

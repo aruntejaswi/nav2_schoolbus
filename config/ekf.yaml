@@ -2,11 +2,11 @@
 ekf_filter_node_odom:
     ros__parameters:
         use_sim_time: false
-        frequency: 30.0
+        frequency: 15.0
         sensor_timeout: 0.2
         two_d_mode: true
-        transform_timeout: 0.2
-        transform_time_offset: 0.2
+        transform_timeout: 0.01
+        transform_time_offset: 0.3  # larger offset ensures TF buffer has entries before AND after scan timestamp; at 15Hz EKF, entry N-5 lands ~35ms before scan time
         print_diagnostics: true
         debug: false
         publish_tf: true
@@ -21,15 +21,28 @@ ekf_filter_node_odom:
         #* Does not use IMU data
         odom0: /kiss/odometry
         # prettier-ignore
-        odom0_config: [true, true, true, # !x, !y, z position
-                       true, true, true, # roll, pitch, !yaw
-                       false, false, false, # !x, !y, z velocity
-                       false, false, false, # roll, pitch, !yaw velocity
-                       false, false, false] # x, y, z acceleration
+        odom0_config: [true,  true,  false, # x, y — fuse; z — ignore (ground robot, two_d_mode)
+                       false, false, true,  # roll, pitch — ignore; yaw — fuse
+                       false, false, false, # velocities not provided by KISS-ICP pose
+                       false, false, false,
+                       false, false, false]
         odom0_queue_size: 10
         odom0_differential: false
         odom0_relative: false
         # odom0_pose_rejection_threshold: 1.5
+
+        # BNO085 — angular velocity only (gyro smoothing between KISS-ICP updates)
+        # Re-enabled: earlier oscillation was caused by duplicate velodyne drivers, not IMU conflict
+        imu0: /imu/BNO085_filtered
+        imu0_config: [false, false, false,
+                      false, false, false,
+                      false, false, false,
+                      true,  true,  true,
+                      false, false, false]
+        imu0_queue_size: 10
+        imu0_differential: false
+        imu0_relative: false
+        imu0_remove_gravitational_acceleration: false
 
         # # IMU - BMI088
         # # DOES NOT adapt for gravity
@@ -47,8 +60,11 @@ ekf_filter_node_odom:
         # imu0_remove_gravitational_acceleration: true
 
         # # # IMU - BNO085
-        # #* Adapts for gravity
-        # # Orientation, angular velocity, linear acceleration
+        #* DISABLED: BNO085 provides absolute yaw in ENU (magnetic north reference).
+        #* KISS-ICP yaw uses robot startup heading as reference. These two reference frames
+        #* differ by ~90-180° indoors (magnetic interference), causing EKF to blend
+        #* incompatible yaw estimates → systematic rotation → fan/creep map artifact.
+        #* KISS-ICP at voxel_size=0.08m provides sufficient yaw for indoor SLAM.
         # imu0: /imu/BNO085_filtered
         # # prettier-ignore
         # imu0_config: [false, false, false, # x, y, z position
@@ -59,36 +75,31 @@ ekf_filter_node_odom:
         # imu0_queue_size: 200
         # imu0_differential: false
         # imu0_relative: false
-        # # imu0_pose_rejection_threshold: 1.5
-        # # imu0_twist_rejection_threshold: 1.5
-        # # imu0_linear_acceleration_rejection_threshold: 1.5
-        # imu0_remove_gravitational_acceleration: false
-
-        #! RESET TO imu1 IF USING TWO IMUS, also /imu/LSM6DSOX_filtered uses filtered data, _data is raw
-        # # IMU - LSM6DSOX
-        #* Adapts for gravity
-        # Orientation, angular velocity, linear acceleration
-        imu0: /imu/LSM6DSOX_filtered
-        # prettier-ignore
-        imu0_config: [false, false, false, # x, y, z position
-                      true, true, true, # roll, pitch, yaw
-                      false, false, false, # x, y, z velocity
-                      false, false, false, # roll, pitch, yaw velocity
-                      false, false, false] # x, y, z acceleration
-        imu0_queue_size: 100
-        imu0_differential: true
-        imu0_relative: true
         # imu0_pose_rejection_threshold: 1.5
         # imu0_twist_rejection_threshold: 1.5
         # imu0_linear_acceleration_rejection_threshold: 1.5
-        imu0_remove_gravitational_acceleration: true
+        # imu0_remove_gravitational_acceleration: false
+
+        #! RESET TO imu1 IF USING TWO IMUS
+        # # IMU - LSM6DSOX (no serial publisher configured — use BNO085 instead)
+        # imu0: /imu/LSM6DSOX_filtered
+        # # prettier-ignore
+        # imu0_config: [false, false, false, # x, y, z position
+        #               true, true, true, # roll, pitch, yaw
+        #               false, false, false, # x, y, z velocity
+        #               false, false, false, # roll, pitch, yaw velocity
+        #               false, false, false] # x, y, z acceleration
+        # imu0_queue_size: 100
+        # imu0_differential: true
+        # imu0_relative: false
+        # imu0_remove_gravitational_acceleration: true
         # initial_estimate_covariance: [1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6]
 
 ### GLOBAL EKF ###
 ekf_filter_node_map:
     ros__parameters:
         use_sim_time: false
-        frequency: 30.0
+        frequency: 15.0
         sensor_timeout: 0.2
         two_d_mode: true
         transform_timeout: 0.2
@@ -163,7 +174,7 @@ ekf_filter_node_map:
                       false, false, false] # x, y, z acceleration
         imu0_queue_size: 100
         imu0_differential: true
-        imu0_relative: true
+        imu0_relative: false
         # imu0_pose_rejection_threshold: 1.5
         # imu0_twist_rejection_threshold: 1.5
         # imu0_linear_acceleration_rejection_threshold: 1.5

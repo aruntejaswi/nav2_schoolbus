@@ -1,7 +1,7 @@
-image: nav2_map.pgm
+image: slam_map_20260407_125915.pgm
 mode: trinary
 resolution: 0.050
-origin: [-7.326, -5.955, 0]
+origin: [-1.901, -3.297, 0]
 negate: 0
 occupied_thresh: 0.65
 free_thresh: 0.196
