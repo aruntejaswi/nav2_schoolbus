@@ -566,8 +566,8 @@ controller_server:
             max_lookahead_dist: 2.0
             lookahead_time: 1.0
             use_velocity_scaled_lookahead_dist: true
-            min_approach_linear_velocity: 0.5
-            approach_velocity_scaling_dist: 0.0
+            min_approach_linear_velocity: 0.3
+            approach_velocity_scaling_dist: 3.0
             use_collision_detection: false
             use_regulated_linear_velocity_scaling: true
             use_fixed_curvature_lookahead: false
@@ -593,12 +593,55 @@ planner_server:
         expected_planner_frequency: 20.0
         planner_plugins: ["GridBased"]
         costmap_update_timeout: 1.0
+        # --- Fallback: NavFn A* 2D grid planner (not Ackermann-aware) ---
+        # Uncomment this block and comment out SmacPlannerHybrid below to revert.
+        # GridBased:
+        #     plugin: "nav2_navfn_planner::NavfnPlanner"
+        #     tolerance: 0.5
+        #     use_astar: true
+        #     allow_unknown: true
+        #     use_final_approach_orientation: true
+        # --- SmacPlannerHybrid: Hybrid A* in (x,y,theta) with Dubin primitives ---
+        # Respects minimum turning radius — emits Ackermann-feasible paths.
         GridBased:
-            plugin: "nav2_navfn_planner::NavfnPlanner"
+            plugin: "nav2_smac_planner::SmacPlannerHybrid"
+            # Planner topology
+            downsample_costmap: false
+            downsampling_factor: 1
             tolerance: 0.5
-            use_astar: true
             allow_unknown: true
-            use_final_approach_orientation: true
+            max_iterations: 1000000
+            max_on_approach_iterations: 1000
+            max_planning_time: 5.0
+            # Motion model — forward-only Dubins curves (matches RPP allow_reversing:false)
+            motion_model_for_search: "DUBIN"
+            angle_quantization_bins: 72
+            analytic_expansion_ratio: 3.5
+            analytic_expansion_max_length: 3.0
+            analytic_expansion_max_cost: 200.0
+            analytic_expansion_max_cost_override: false
+            # Kinematics — robot wheelbase 0.711m, double Ackermann, 45deg max steer
+            minimum_turning_radius: 0.75
+            reverse_penalty: 2.0
+            change_penalty: 0.0
+            non_straight_penalty: 1.2
+            cost_penalty: 2.0
+            retrospective_penalty: 0.015
+            # Built-in smoother
+            smooth_path: true
+            smoother:
+                max_iterations: 1000
+                w_smooth: 0.3
+                w_data: 0.2
+                tolerance: 1.0e-10
+                do_refinement: true
+                refinement_num: 2
+            # Heuristics / debug
+            debug_visualizations: false
+            use_quadratic_approximation: false
+            use_feasible_obstacle_heuristic: false
+            lookup_table_size: 20.0
+            cache_obstacle_heuristic: false
 
 smoother_server:
     ros__parameters:
@@ -653,12 +696,12 @@ velocity_smoother:
         feedback: "OPEN_LOOP"
         max_velocity: [1.5, 0.0, 1.0]
         min_velocity: [-1.5, 0.0, -1.0]
-        max_accel: [0.8, 0.0, 1.5]
-        max_decel: [-1.0, 0.0, -1.5]
+        max_accel: [0.5, 0.0, 1.0]
+        max_decel: [-2.5, 0.0, -3.0]
         odom_topic: /odometry/local
         odom_duration: 0.1
         deadband_velocity: [0.02, 0.0, 0.02]
-        velocity_timeout: 1.0
+        velocity_timeout: 0.1
 
 collision_monitor:
     ros__parameters:
