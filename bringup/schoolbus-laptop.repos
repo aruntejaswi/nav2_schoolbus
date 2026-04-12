@@ -1,0 +1,30 @@
+# Schoolbus manifest — Laptop workspace (SLAM + Nav2 + lidar odometry).
+#
+# The laptop runs the high-level navigation stack. Hardware drivers (motors,
+# RC receiver, IMU, Velodyne) run on the Pi — do NOT add control_tower_ros2,
+# ibus_reader, etc. here.
+#
+# Usage:
+#   cd ~/ros2_ws
+#   vcs import src < bringup/schoolbus-laptop.repos
+#   rosdep install --from-paths src --ignore-src -r -y
+#   colcon build --symlink-install
+#
+# Or just run bringup/bootstrap.sh --target laptop
+#
+# IMPORTANT: nav2_schoolbus is pinned to a tag — bump it every time SLAM+Nav2
+# is validated working in a new scenario.
+
+repositories:
+  nav2_schoolbus:
+    type: git
+    url: https://github.com/LTU-Actor/nav2_schoolbus.git
+    version: v2026.04.12-indoor-working
+  kiss-icp:
+    type: git
+    url: https://github.com/PRBonn/kiss-icp.git
+    version: main
+  schoolbus_description:
+    type: git
+    url: https://github.com/LTU-Actor/schoolbus_description.git
+    version: master

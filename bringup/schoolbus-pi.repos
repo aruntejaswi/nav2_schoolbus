@@ -1,25 +1,17 @@
-# Canonical manifest for the Schoolbus autonomous ground vehicle.
+# Schoolbus manifest — Raspberry Pi workspace (sensors + motors + RC).
 #
-# Used by vcstool to clone every repo the robot needs at the right version.
+# The Pi runs hardware drivers only. Nav2, SLAM, Nav2, and kiss-icp run on
+# the laptop — do NOT add nav2_schoolbus or kiss-icp here.
 #
-# Usage on a fresh machine:
-#   mkdir -p ~/ros2_ws/src
+# Usage:
 #   cd ~/ros2_ws
-#   vcs import src < /path/to/schoolbus.repos
+#   vcs import src < bringup/schoolbus-pi.repos
 #   rosdep install --from-paths src --ignore-src -r -y
 #   colcon build --symlink-install
 #
-# Or run bringup/bootstrap.sh which does all of the above.
-#
-# IMPORTANT: nav2_schoolbus is pinned to a tag — bump it every time SLAM+Nav2
-# is validated working in a new scenario. Other repos float on main/master
-# for now; pin them to commit SHAs once you have a reason to.
+# Or just run bringup/bootstrap.sh --target pi
 
 repositories:
-  nav2_schoolbus:
-    type: git
-    url: https://github.com/LTU-Actor/nav2_schoolbus.git
-    version: v2026.04.12-indoor-working
   control_tower_ros2:
     type: git
     url: https://github.com/LTU-Actor/control_tower_ros2.git
@@ -40,10 +32,6 @@ repositories:
     type: git
     url: https://github.com/LTU-Actor/schoolbus_description.git
     version: master
-  kiss-icp:
-    type: git
-    url: https://github.com/PRBonn/kiss-icp.git
-    version: main
   imu_serial_to_ros_publisher:
     type: git
     url: https://github.com/Aeolus96/imu_serial_to_ros_publisher.git

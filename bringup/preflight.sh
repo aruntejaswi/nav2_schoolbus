@@ -54,10 +54,11 @@ LAPTOP_LAUNCH_DIR="/home/dev/ros2_ws/install/nav2_schoolbus/share/nav2_schoolbus
 PI_CONFIG_DIR="/home/pi/ros2_ws/src/nav2_schoolbus/config"
 PI_LAUNCH_DIR="/home/pi/ros2_ws/src/nav2_schoolbus/launch"
 
-# Critical files to check for config drift (subset that matters for SLAM)
-CONFIG_FILES=(nav2_params.yaml ekf.yaml kiss_icp_indoor.yaml imu_filter_BNO085.yaml imu_filter_LSM6DSOX.yaml)
-LAPTOP_LAUNCH_FILES=(bringup_launch.py navigation_launch.py slam_launch.py)
-PI_LAUNCH_FILES=(schoolbus.launch.py)
+# Expected nav2_schoolbus commit: both machines should be checked out at the
+# same tag as the VM's copy of nav2_schoolbus. Override with EXPECTED_TAG env
+# var when testing a different tag. Default derives from the current repo's
+# most recent reachable tag.
+EXPECTED_TAG="${EXPECTED_TAG:-}"
 
 # ---------------------------------------------------------------------------
 # Parse arguments
@@ -407,140 +408,130 @@ check_laptop_legacy_config_dirs() {
 }
 
 # ---------------------------------------------------------------------------
-# Check functions — Config Drift (repo vs deployed)
+# Check functions — Commit Drift (nav2_schoolbus git state on each machine)
+#
+# Replaces the old md5-based config/launch file drift check and its scp-deploy
+# --fix path. Both machines should be checked out at the same nav2_schoolbus
+# tag, symlink-built via colcon. If not, --fix runs `git fetch + git checkout
+# + colcon build --symlink-install --packages-select nav2_schoolbus` on the
+# drifted machine. Git is the deploy mechanism; scp no longer touches code.
 # ---------------------------------------------------------------------------
-check_config_drift() {
-    local mismatched=()
-    local checked=0
+check_commit_drift() {
+    # Resolve the expected tag. Precedence:
+    #   1. EXPECTED_TAG env var (explicit override)
+    #   2. Latest 'v*' tag in the VM's copy of nav2_schoolbus, sorted by version
+    # We intentionally do not use `git describe` — the VM's HEAD is typically on
+    # an editing branch ahead of the latest release tag, so describe wouldn't
+    # find anything. Picking the max v* tag gives the right answer regardless
+    # of what branch the VM is on.
+    local expected_tag="$EXPECTED_TAG"
+    if [[ -z "$expected_tag" ]]; then
+        expected_tag=$(cd "$NAV2_SCHOOLBUS_DIR" && git tag -l 'v*' | sort -V | tail -1 || true)
+    fi
 
-    # Check config files on LAPTOP
-    for f in "${CONFIG_FILES[@]}"; do
-        local local_file="$LOCAL_CONFIG_DIR/$f"
-        [[ ! -f "$local_file" ]] && continue
+    if [[ -z "$expected_tag" ]]; then
+        warn "No expected tag resolvable" \
+             "Create a tag on $NAV2_SCHOOLBUS_DIR (e.g. git tag vYYYY.MM.DD-scenario) or set EXPECTED_TAG=<name>"
+        return
+    fi
 
-        local local_md5 remote_md5
-        local_md5=$(md5sum "$local_file" 2>/dev/null | awk '{print $1}')
-        remote_md5=$($LAPTOP_SSH "md5sum $LAPTOP_CONFIG_DIR/$f 2>/dev/null | awk '{print \$1}'" 2>/dev/null) || true
+    local expected_sha
+    expected_sha=$(cd "$NAV2_SCHOOLBUS_DIR" && git rev-parse "$expected_tag^{commit}" 2>/dev/null || true)
+    if [[ -z "$expected_sha" ]]; then
+        warn "Expected tag $expected_tag not resolvable to a commit in $NAV2_SCHOOLBUS_DIR"
+        return
+    fi
 
-        ((checked++))
-        if [[ -z "$remote_md5" ]]; then
-            mismatched+=("laptop:config/$f (missing on laptop)")
-        elif [[ "$local_md5" != "$remote_md5" ]]; then
-            mismatched+=("laptop:config/$f")
-        fi
-    done
+    info "Expected: $expected_tag ($(cd "$NAV2_SCHOOLBUS_DIR" && git log -1 --format='%h %s' "$expected_sha"))"
 
-    # Check launch files on LAPTOP
-    for f in "${LAPTOP_LAUNCH_FILES[@]}"; do
-        local local_file="$LOCAL_LAUNCH_DIR/$f"
-        [[ ! -f "$local_file" ]] && continue
+    # nav2_schoolbus runs ONLY on the laptop. The Pi should not have it at all —
+    # see check_pi_has_no_nav2_schoolbus. So this check only inspects the laptop.
+    local laptop_sha
+    laptop_sha=$($LAPTOP_SSH "cd ~/ros2_ws/src/nav2_schoolbus && git rev-parse HEAD 2>/dev/null" 2>/dev/null || true)
 
-        local local_md5 remote_md5
-        local_md5=$(md5sum "$local_file" 2>/dev/null | awk '{print $1}')
-        remote_md5=$($LAPTOP_SSH "md5sum $LAPTOP_LAUNCH_DIR/$f 2>/dev/null | awk '{print \$1}'" 2>/dev/null) || true
+    if [[ -z "$laptop_sha" ]]; then
+        warn "Laptop: cannot read git HEAD in ~/ros2_ws/src/nav2_schoolbus" \
+             "Workspace may be missing or broken. See bringup/docs/COLD_BOOT.md to rebuild."
+        return
+    fi
 
-        ((checked++))
-        if [[ -z "$remote_md5" ]]; then
-            mismatched+=("laptop:launch/$f (missing on laptop)")
-        elif [[ "$local_md5" != "$remote_md5" ]]; then
-            mismatched+=("laptop:launch/$f")
-        fi
-    done
+    if [[ "$laptop_sha" == "$expected_sha" ]]; then
+        pass "Laptop at $expected_tag"
+        return
+    fi
 
-    # Check config files on PI
-    for f in "${CONFIG_FILES[@]}"; do
-        local local_file="$LOCAL_CONFIG_DIR/$f"
-        [[ ! -f "$local_file" ]] && continue
+    local laptop_desc
+    laptop_desc=$($LAPTOP_SSH "cd ~/ros2_ws/src/nav2_schoolbus && git log -1 --format='%h %s' 2>/dev/null" 2>/dev/null || echo "$laptop_sha")
 
-        local local_md5 remote_md5
-        local_md5=$(md5sum "$local_file" 2>/dev/null | awk '{print $1}')
-        remote_md5=$($PI_SSH "md5sum $PI_CONFIG_DIR/$f 2>/dev/null | awk '{print \$1}'" 2>/dev/null) || true
-
-        ((checked++))
-        # Pi may not have all config files (e.g., nav2_params.yaml may only be on laptop)
-        if [[ -z "$remote_md5" ]]; then
-            : # skip files that don't exist on Pi — not all are deployed there
-        elif [[ "$local_md5" != "$remote_md5" ]]; then
-            mismatched+=("pi:config/$f")
-        fi
-    done
-
-    # Check launch files on PI
-    for f in "${PI_LAUNCH_FILES[@]}"; do
-        local local_file="$LOCAL_LAUNCH_DIR/$f"
-        [[ ! -f "$local_file" ]] && continue
-
-        local local_md5 remote_md5
-        local_md5=$(md5sum "$local_file" 2>/dev/null | awk '{print $1}')
-        remote_md5=$($PI_SSH "md5sum $PI_LAUNCH_DIR/$f 2>/dev/null | awk '{print \$1}'" 2>/dev/null) || true
-
-        ((checked++))
-        if [[ -z "$remote_md5" ]]; then
-            mismatched+=("pi:launch/$f (missing on Pi)")
-        elif [[ "$local_md5" != "$remote_md5" ]]; then
-            mismatched+=("pi:launch/$f")
-        fi
-    done
-
-    if (( ${#mismatched[@]} == 0 )); then
-        pass "Config sync: $checked files match between repo and deployed"
-    else
-        local fix_cmd="$SCRIPT_DIR/preflight.sh --fix  (deploys repo files to Pi + laptop)"
-
-        if $AUTOFIX; then
-            local fixed=0
-            for entry in "${mismatched[@]}"; do
-                local machine file_part
-                machine="${entry%%:*}"
-                file_part="${entry#*:}"
-                # Strip any parenthetical note like "(missing on laptop)"
-                file_part="${file_part%% (*}"
-
-                local local_path remote_path ssh_cmd scp_key_opts
-                if [[ "$file_part" == config/* ]]; then
-                    local fname="${file_part#config/}"
-                    local_path="$LOCAL_CONFIG_DIR/$fname"
-                    if [[ "$machine" == "laptop" ]]; then
-                        remote_path="$LAPTOP_CONFIG_DIR/$fname"
-                        ssh_cmd="$LAPTOP_SSH"
-                        scp_key_opts=""
-                    else
-                        remote_path="$PI_CONFIG_DIR/$fname"
-                        ssh_cmd="$PI_SSH"
-                        scp_key_opts="-i $PI_KEY"
-                    fi
-                elif [[ "$file_part" == launch/* ]]; then
-                    local fname="${file_part#launch/}"
-                    local_path="$LOCAL_LAUNCH_DIR/$fname"
-                    if [[ "$machine" == "laptop" ]]; then
-                        remote_path="$LAPTOP_LAUNCH_DIR/$fname"
-                        ssh_cmd="$LAPTOP_SSH"
-                        scp_key_opts=""
-                    else
-                        remote_path="$PI_LAUNCH_DIR/$fname"
-                        ssh_cmd="$PI_SSH"
-                        scp_key_opts="-i $PI_KEY"
-                    fi
-                else
-                    continue
-                fi
-
-                local target_host
-                [[ "$machine" == "laptop" ]] && target_host="$LAPTOP_HOST" || target_host="$PI_HOST"
-
-                if scp -o BatchMode=yes $scp_key_opts "$local_path" "$target_host:$remote_path" 2>/dev/null; then
-                    ((fixed++))
-                else
-                    info "  Failed to deploy $entry"
-                fi
-            done
-            pass "Config sync: deployed $fixed/${#mismatched[@]} drifted files from repo"
+    if $AUTOFIX; then
+        info "Syncing laptop to $expected_tag..."
+        # Fetch, checkout, and rebuild nav2_schoolbus only.
+        # Any local uncommitted changes will block the checkout — we
+        # deliberately do not stash/discard; that's a manual decision.
+        if $LAPTOP_SSH "
+            set -e
+            cd ~/ros2_ws/src/nav2_schoolbus
+            git fetch --tags origin 2>&1 | tail -5
+            git checkout '$expected_tag' 2>&1
+            cd ~/ros2_ws
+            source /opt/ros/jazzy/setup.bash
+            colcon build --symlink-install --packages-select nav2_schoolbus 2>&1 | tail -5
+        " 2>&1 | sed "s/^/  [laptop] /"; then
+            pass "Laptop synced to $expected_tag"
         else
-            warn "Config drift: ${#mismatched[@]} file(s) differ between repo and deployed:" "$fix_cmd"
-            for entry in "${mismatched[@]}"; do
-                info "  $entry"
-            done
+            warn "Failed to sync laptop" \
+                 "Check for local uncommitted changes blocking checkout"
         fi
+    else
+        local fix_cmd="$SCRIPT_DIR/preflight.sh --fix  (fetches $expected_tag and rebuilds nav2_schoolbus on the laptop)"
+        warn "Laptop commit drift: at $laptop_desc, expected $expected_tag" "$fix_cmd"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Pi cleanliness check — nav2_schoolbus should NOT be on the Pi.
+#
+# Nav2 and SLAM run on the laptop. The Pi only runs sensor drivers + motor
+# control via ractor_pi_launches. Having nav2_schoolbus on the Pi is dead
+# weight from the pre-split-machine era. Flag it so it can be removed.
+# ---------------------------------------------------------------------------
+check_pi_has_no_nav2_schoolbus() {
+    local present
+    present=$($PI_SSH "test -d ~/ros2_ws/src/nav2_schoolbus && echo yes || echo no" 2>/dev/null)
+
+    if [[ "$present" == "no" ]]; then
+        pass "Pi does not have nav2_schoolbus (correct — laptop-only package)"
+    elif [[ "$present" == "yes" ]]; then
+        warn "Pi has nav2_schoolbus in ~/ros2_ws/src/ — dead weight, should be removed" \
+             "The Pi does not run Nav2. Remove with: ssh $PI_HOST 'rm -rf ~/ros2_ws/src/nav2_schoolbus ~/ros2_ws/build/nav2_schoolbus ~/ros2_ws/install/nav2_schoolbus'"
+    else
+        warn "Pi: could not determine whether nav2_schoolbus is present" \
+             "Manually run: ssh $PI_HOST 'ls ~/ros2_ws/src/nav2_schoolbus'"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Install-tree sanity check — catches manual scp regressions on the laptop.
+#
+# If someone drops a file directly into install/nav2_schoolbus/... instead of
+# editing src/ and rebuilding, the install-tree symlink will point somewhere
+# outside src/. Flag it immediately — that's the exact failure mode that got
+# the laptop workspace into its previous broken state. Laptop only: the Pi
+# doesn't have nav2_schoolbus (see check_pi_has_no_nav2_schoolbus).
+# ---------------------------------------------------------------------------
+check_install_tree_symlinks() {
+    local marker_file="share/nav2_schoolbus/config/nav2_params.yaml"
+    local laptop_resolved
+    laptop_resolved=$($LAPTOP_SSH "readlink -f /home/dev/ros2_ws/install/nav2_schoolbus/$marker_file 2>/dev/null" 2>/dev/null || true)
+
+    if [[ -z "$laptop_resolved" ]]; then
+        warn "Cannot read laptop install tree marker file" \
+             "Is /home/dev/ros2_ws/install/nav2_schoolbus/$marker_file missing? Rebuild with colcon."
+    elif [[ "$laptop_resolved" != /home/dev/ros2_ws/src/* ]]; then
+        warn "Laptop install tree is NOT a real symlink-install — $marker_file resolves to $laptop_resolved" \
+             "Someone scp'd a file into install/. Rebuild from scratch: see bringup/docs/COLD_BOOT.md"
+    else
+        pass "Laptop install tree resolves to src/ (real symlink build)"
     fi
 }
 
@@ -692,10 +683,18 @@ if $laptop_reachable; then
     echo ""
 fi
 
-# --- Config Drift ---
+# --- Commit Drift + Pi Cleanliness ---
 if $pi_reachable && $laptop_reachable; then
-    echo -e "${BOLD}--- Config Sync (repo vs deployed) ---${NC}"
-    check_config_drift
+    echo -e "${BOLD}--- Commit Drift (nav2_schoolbus tag) ---${NC}"
+    check_commit_drift
+    check_pi_has_no_nav2_schoolbus
+    echo ""
+fi
+
+# --- Install-tree sanity ---
+if $pi_reachable && $laptop_reachable; then
+    echo -e "${BOLD}--- Install tree sanity ---${NC}"
+    check_install_tree_symlinks
     echo ""
 fi
 
