@@ -176,10 +176,17 @@ echo "     source $WORKSPACE/install/setup.bash"
 echo ""
 case "$TARGET" in
     pi)
-        echo " Next on the Pi: enable and start the systemd services:"
-        echo "     sudo systemctl enable --now ractor-sensors.service ractor-controls.service"
+        echo " Next on the Pi: install and start the systemd services."
         echo ""
-        echo " For the URDF TF tree (robot_state_publisher), see bringup/docs/COLD_BOOT.md."
+        echo " ractor-robot-state.service (URDF TF tree) is shipped in this repo:"
+        echo "     sudo install -m 644 $SCRIPT_DIR/systemd/ractor-robot-state.service \\"
+        echo "         /etc/systemd/system/ractor-robot-state.service"
+        echo "     sudo systemctl daemon-reload"
+        echo "     sudo systemctl enable --now ractor-robot-state.service"
+        echo ""
+        echo " ractor-sensors.service and ractor-controls.service are installed"
+        echo " separately (not from this repo):"
+        echo "     sudo systemctl enable --now ractor-sensors.service ractor-controls.service"
         ;;
     laptop)
         echo " Next on the laptop: launch the Nav2 + SLAM stack:"

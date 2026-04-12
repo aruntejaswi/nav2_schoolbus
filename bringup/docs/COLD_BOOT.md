@@ -23,6 +23,7 @@ reference.
 │  • Motor control (systemd)   │         │  • EKF sensor fusion         │
 │  • RC receiver  (systemd)    │         │  • SLAM Toolbox              │
 │  • robot_state_publisher     │         │  • Nav2 (SmacPlannerHybrid)  │
+│    (systemd)                 │         │                              │
 └──────────────────────────────┘         └──────────────────────────────┘
          no nav2_schoolbus                     no hardware drivers
          (nav2 runs on laptop only)            (drivers run on Pi only)
@@ -87,10 +88,14 @@ What it checks:
 Fix anything red before moving on. Yellow (WARN) is usually OK to proceed;
 red (FAIL) is a blocker.
 
+Cold-boot procedure is now only **4 steps** (preflight, Pi services,
+laptop bringup, RViz + drive) — robot_state_publisher is a systemd
+service, no manual launch needed.
+
 ### Step 1 — Start Pi hardware services
 
 ```bash
-ssh pi@192.168.0.3 'sudo systemctl restart ractor-sensors.service ractor-controls.service'
+ssh pi@192.168.0.3 'sudo systemctl restart ractor-sensors.service ractor-controls.service ractor-robot-state.service'
 ```
 
 These are sometimes `inactive` after a power cycle even though they're
@@ -99,23 +104,11 @@ enabled — the restart forces them up.
 Verify:
 
 ```bash
-ssh pi@192.168.0.3 'systemctl is-active ractor-sensors.service ractor-controls.service'
-# expect: active\nactive
+ssh pi@192.168.0.3 'systemctl is-active ractor-sensors.service ractor-controls.service ractor-robot-state.service'
+# expect: active\nactive\nactive
 ```
 
-### Step 2 — Launch `robot_state_publisher` on the Pi
-
-This publishes the URDF TF tree. It is **not** managed by systemd today
-(planned follow-up). Without it, KISS-ICP and SLAM have no
-`3d_lidar_link` or `base_footprint` frame and will fail silently.
-
-```bash
-ssh pi@192.168.0.3
-ros2 launch schoolbus_urdf schoolbus.launch.py
-# Leave this terminal open — it stays running
-```
-
-### Step 3 — Launch SLAM + Nav2 on the laptop
+### Step 2 — Launch SLAM + Nav2 on the laptop
 
 Open a new terminal (or SSH from the VM to the laptop):
 
@@ -137,7 +130,7 @@ ending with:
 That line means the stack is up. If you don't see it within 60 seconds,
 something is wrong — see troubleshooting below.
 
-### Step 4 — Open RViz2
+### Step 3 — Open RViz2
 
 ```bash
 # On the laptop (or VM with X forwarding)
@@ -150,7 +143,7 @@ rviz2
 - The map will start empty and grow as SLAM builds it from the Velodyne
   scans
 
-### Step 5 — Drive
+### Step 4 — Drive
 
 1. Flip **Switch B** on the physical joystick to the **auto** position.
 2. Click the **Nav2 Goal** button in RViz and place a goal in front of
@@ -192,7 +185,11 @@ ssh pi@192.168.0.3 'sudo systemctl restart ractor-sensors.service'
 
 ### "3d_lidar_link frame does not exist"
 
-`robot_state_publisher` isn't running. Redo Step 2.
+`ractor-robot-state.service` isn't running on the Pi. Restart it:
+
+```bash
+ssh pi@192.168.0.3 'sudo systemctl restart ractor-robot-state.service'
+```
 
 ### Nav2 lifecycle never activates / bringup hangs after 25 seconds
 
