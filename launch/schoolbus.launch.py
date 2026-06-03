@@ -169,11 +169,30 @@ def launch_robot_localization_gps():
     )
 
 
+# Map-less navigation: lock map->odom as identity (no SLAM/AMCL). The "map" frame is just a frozen
+# alias for odom so Nav2's global costmap (global_frame: map) has a valid frame. No persistent map is
+# built or localized against — the global costmap is rolling and built from live perception only.
+def static_map_to_odom():
+    return Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="static_map_to_odom",
+        arguments=["0", "0", "0", "0", "0", "0", "map", "odom"],
+        output="screen",
+    )
+
+
 # Nav2 Bringup
 def launch_nav2_bringup():
+    # bringup_launch.py OWNS the odometry pipeline (pointcloud_to_laserscan + KISS-ICP + local EKF)
+    # PLUS Nav2. Do NOT also launch those odom nodes here — duplicates double-publish TF and corrupt odometry.
     return IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(get_package_share_directory("nav2_schoolbus"), "bringup_launch.py")),
-        condition=IfCondition(LaunchConfiguration("nav2"))
+        condition=IfCondition(LaunchConfiguration("nav2")),
+        launch_arguments={
+            "slam": "False",            # map-less: no SLAM
+            "use_localization": "False",  # map-less: no AMCL/pre-recorded map (rolling global costmap instead)
+        }.items(),
     )
 
 def launch_masker():
@@ -213,7 +232,17 @@ def pothole():
 def routecam():
     return IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(get_package_share_directory("routecam_ros2"), "routecam.launch.py")))
-        
+
+
+# Lane lines -> ground-plane PointCloud2 for the Nav2 lane costmap layers
+def launch_transpose_lane_lines():
+    # /white_mask,/yellow_mask + /routecam/camera_info -> /white_lane_points,/yellow_lane_points
+    # consumed by nav2_params white_lane_layer / yellow_lane_layer (ObstacleLayer).
+    return IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(get_package_share_directory("transpose_lane_lines"), "launch/lines.launch.py"))
+    )
+
+
 def routecam_nav2():
     try:
         pkg = get_package_share_directory("routecam_nav2")
@@ -226,27 +255,38 @@ def routecam_nav2():
 
 
 def generate_launch_description():
+    # Single-command mission launcher (LAPTOP side, multi-machine).
+    # The Pi provides sensors (ractor-sensors), motors (ractor-controls), and the URDF/TF tree
+    # (schoolbus_urdf). bringup_launch.py (via launch_nav2_bringup) owns odometry + SLAM + Nav2.
+    # Goal: Nav2 drives to a goal while avoiding obstacles (velodyne) and staying in lane (camera).
     ld = LaunchDescription([
         nav2_arg,
         nav2_enable_arg,
         odometry_arg,
-        launch_pointcloud_to_scan(),
-        launch_schoolbus_description(),
-        launch_imu_serial_BNO085(),
-        imu_filter_madgwick_BNO085(),
+
+        # IMU filter — EKF consumes /imu/LSM6DSOX_filtered; raw /imu/LSM6DSOX_data comes from the Pi
         imu_filter_madgwick_LSM6DSOX(),
-        launch_kiss_lidar_odometry(),
-        launch_robot_localization_local(),
-        # launch_robot_localization_global(),
-        # launch_robot_localization_gps(),
+
+        # Map-less: static map->odom identity (no SLAM/AMCL); global costmap is rolling/live
+        static_map_to_odom(),
+
+        # Odometry + Nav2 (owns pointcloud_to_laserscan, KISS-ICP, local EKF — see launch_nav2_bringup)
         launch_nav2_bringup(),
-        # launch_masker(),
-        # launch_blob(),
-        # launch_cloud_regions(),
-        # launch_yolo_detector(),
-        # launch_ezrospy(),
-        # pothole(),
-        # routecam(),
-        routecam_nav2(),
+
+        # Lane perception: camera -> HSV masks -> ground-plane lane points -> Nav2 lane costmap layers
+        routecam(),
+        launch_masker(),
+        launch_transpose_lane_lines(),
+
+        # --- Intentionally NOT launched here ---
+        # launch_schoolbus_description(),    # URDF/robot_state_publisher runs on the Pi
+        # launch_pointcloud_to_scan(),       # owned by bringup_launch.py (duplicate corrupts odom)
+        # launch_kiss_lidar_odometry(),      # owned by bringup_launch.py
+        # launch_robot_localization_local(), # owned by bringup_launch.py
+        # launch_imu_serial_BNO085(),        # BNO085 serial device is on the Pi
+        # imu_filter_madgwick_BNO085(),      # using LSM6DSOX as the EKF IMU
+        # launch_blob(),                     # reactive follower — CONFLICTS with Nav2 on /control/cmd_vel
+        # launch_cloud_regions(), launch_yolo_detector(), launch_ezrospy(), pothole(),  # not needed for lane-keeping
+        # routecam_nav2(),                   # separate camera variant; using routecam() above
         ])
     return ld

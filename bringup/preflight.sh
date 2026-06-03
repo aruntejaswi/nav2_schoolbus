@@ -210,6 +210,34 @@ check_clock_drift() {
     # Both machines run chrony syncing to NTP. We check each machine's offset from NTP.
     local pi_offset laptop_offset
 
+    # --- Guard: the fine offset check below reads each machine's offset from ITS
+    # OWN reference. If the Pi's chrony is locked to nothing (Reference ID
+    # 00000000 — happens after a Pi reimage when the laptop's ufw blocks udp/123),
+    # it reports ~0 and would FALSELY PASS while the clocks are days apart. So
+    # first compare wall clocks directly and confirm the Pi is disciplined to the
+    # laptop. (Seen 2026-06-03: Pi 4 days behind, every velodyne cloud dropped by
+    # the costmaps' message filter.)
+    local pi_refid pi_epoch laptop_epoch gross_skew
+    pi_refid=$($PI_SSH "chronyc tracking 2>/dev/null | awk '/Reference ID/{print \$4}'" 2>/dev/null) || pi_refid=""
+    laptop_epoch=$($LAPTOP_SSH "date +%s" 2>/dev/null) || laptop_epoch=""
+    pi_epoch=$($PI_SSH "date +%s" 2>/dev/null) || pi_epoch=""
+
+    local ntp_fix="On laptop: sudo ufw allow from 192.168.0.0/24 to any port 123 proto udp  --  then on Pi: sudo systemctl restart chrony"
+
+    if [[ -n "$laptop_epoch" && -n "$pi_epoch" ]]; then
+        gross_skew=$(( laptop_epoch > pi_epoch ? laptop_epoch - pi_epoch : pi_epoch - laptop_epoch ))
+        # >5s tolerates the ~1-2s sequential-SSH sampling artifact; catches gross skew.
+        if (( gross_skew > 5 )); then
+            fail "Pi clock ${gross_skew}s off the laptop (Pi chrony ref: ${pi_refid:-none}) — sensor stamps will be rejected by TF/costmaps" "$ntp_fix"
+            return
+        fi
+    fi
+
+    if [[ "$pi_refid" == "00000000" || -z "$pi_refid" ]]; then
+        fail "Pi chrony is not locked to the laptop (Reference ID: ${pi_refid:-unreadable}, Reach 0) — clocks will drift apart" "$ntp_fix"
+        return
+    fi
+
     laptop_offset=$($LAPTOP_SSH "chronyc tracking 2>/dev/null | grep 'System time' | grep -oP '[0-9]+\.[0-9]+'" 2>/dev/null) || laptop_offset=""
     pi_offset=$($PI_SSH "chronyc tracking 2>/dev/null | grep 'System time' | grep -oP '[0-9]+\.[0-9]+'" 2>/dev/null) || pi_offset=""
 

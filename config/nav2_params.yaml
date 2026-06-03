@@ -11,7 +11,15 @@ local_costmap:
             height: 20
             resolution: 0.1
             robot_radius: 0.35
-            plugins: ["obstacle_layer", "inflation_layer"]
+            plugins: [
+                    "obstacle_layer",
+                    "white_lane_layer",
+                    "yellow_lane_layer",
+                    "denoise_layer",
+                    "inflation_layer",
+                ] # no static_layer: local costmap is rolling, not map-based
+                  # NOTE: dropped "stvl_layer" (needs spatio_temporal_voxel_layer pkg, not installed)
+                  # and fixed "white_line_layer" -> "white_lane_layer" (the actual defined ObstacleLayer)
             # static_layer:
             #     plugin: "nav2_costmap_2d::StaticLayer"
             #     enabled: true
@@ -53,23 +61,60 @@ local_costmap:
                     # horizontal_fov_angle: 1.048
                     decay_acceleration: 15.0
                     model_type: 1
+
             obstacle_layer:
                 plugin: "nav2_costmap_2d::ObstacleLayer"
                 enabled: true
+                combination_method: 1
+                footprint_clearing_enabled: true
                 observation_sources: pointcloud
                 pointcloud:
-                    data_type: PointCloud2
+                    # NOTE: ObstacleLayer ignores VoxelLayer-style keys (min_z/max_z/filter/
+                    # obstacle_range/max_obstacle_distance). The competition config used those, so
+                    # max_obstacle_height defaulted to 0.0 -> ZERO velodyne marking. Use valid keys:
+                    data_type: "PointCloud2"
                     topic: /velodyne_points
-                    obstacle_range: 10.0
-                    min_obstacle_height: 0.25
-                    max_obstacle_height: 1.5
-                    max_obstacle_distance: 10.0
-                    min_z: 0.1
-                    max_z: 2.0
-                    filter: "voxel"
-                    voxel_min_points: 0
-                    clearing: true
                     marking: true
+                    clearing: true
+                    min_obstacle_height: 0.2     # reject ground returns
+                    max_obstacle_height: 2.0
+                    obstacle_max_range: 10.0     # was obstacle_range (ignored -> defaulted 2.5)
+                    obstacle_min_range: 0.0
+                    raytrace_max_range: 12.0     # was max_obstacle_distance (ignored -> defaulted 3.0)
+                    raytrace_min_range: 0.0
+
+            white_lane_layer:
+                plugin: "nav2_costmap_2d::ObstacleLayer"
+                enabled: true
+                combination_method: 1
+                footprint_clearing_enabled: false
+                min_obstacle_height: -0.5
+                max_obstacle_height: 2.0
+                observation_sources: white_lines
+                white_lines:
+                    topic: /white_lane_points
+                    obstacle_max_range: 5.5
+                    raytrace_max_range: 6.0
+                    clearing: False
+                    marking: True
+                    data_type: "PointCloud2"
+
+            yellow_lane_layer:
+                plugin: "nav2_costmap_2d::ObstacleLayer"
+                enabled: true
+                combination_method: 1
+                footprint_clearing_enabled: false
+                min_obstacle_height: -0.5
+                max_obstacle_height: 2.0
+                observation_sources: yellow_lines
+                yellow_lines:
+                    topic: /yellow_lane_points
+                    obstacle_max_range: 5.5
+                    raytrace_max_range: 6.0
+                    clearing: False
+                    marking: True
+                    data_type: "PointCloud2"
+
             denoise_layer:
                 plugin: "nav2_costmap_2d::DenoiseLayer"
                 enabled: true
@@ -88,39 +133,37 @@ local_costmap:
             #     unknown_cost_value: 0
             #     trinary_costmap: false             # IMPORTANT: keep full 0–100 range, not binarized
             #     enabled: true
-            line_stvl_layer:
-                plugin: "spatio_temporal_voxel_layer/SpatioTemporalVoxelLayer"
-                enabled: true
-                voxel_decay: 10.0                 # Time before voxels decay (seconds)
-                decay_model: 0                    # 0=linear, 1=exponential  
-                voxel_size: 0.1                   # Match costmap resolution
-                track_unknown_space: false        # Lines don't need unknown space
-                unknown_threshold: 15
-                mark_threshold: 0
-                update_footprint_enabled: true
-                combination_method: 1
-                origin_z: 0.0
-                publish_voxel_map: false          # Disable unless debugging
-                transform_tolerance: 0.9
-                mapping_mode: false
-                observation_sources: camera_lines
-                camera_lines:
-                    data_type: PointCloud2
-                    topic: /camera_line_points
-                    marking: true
-                    clearing: false                  # No raytracing clearing
-                    obstacle_range: 5.0
-                    min_obstacle_height: -0.1
-                    max_obstacle_height: 0.1          # Thin ground layer for lines
-                    expected_update_rate: 0.0         # Don't timeout on brief pauses
-                    observation_persistence: 0.0
-                    inf_is_valid: false
-                    filter: "voxel"
-                    voxel_min_points: 0
-                    max_z: 0.1
-                    min_z: -0.1
-
-
+            # line_stvl_layer:
+            #     plugin: "spatio_temporal_voxel_layer/SpatioTemporalVoxelLayer"
+            #     enabled: true
+            #     voxel_decay: 10.0                 # Time before voxels decay (seconds)
+            #     decay_model: 0                    # 0=linear, 1=exponential
+            #     voxel_size: 0.1                   # Match costmap resolution
+            #     track_unknown_space: false        # Lines don't need unknown space
+            #     unknown_threshold: 15
+            #     mark_threshold: 0
+            #     update_footprint_enabled: true
+            #     combination_method: 1
+            #     origin_z: 0.0
+            #     publish_voxel_map: false          # Disable unless debugging
+            #     transform_tolerance: 0.9
+            #     mapping_mode: false
+            #     observation_sources: camera_lines
+            #     camera_lines:
+            #         data_type: PointCloud2
+            #         topic: /camera_line_points
+            #         marking: true
+            #         clearing: false                  # No raytracing clearing
+            #         obstacle_range: 5.0
+            #         min_obstacle_height: -0.1
+            #         max_obstacle_height: 0.1          # Thin ground layer for lines
+            #         expected_update_rate: 0.0         # Don't timeout on brief pauses
+            #         observation_persistence: 0.0
+            #         inf_is_valid: false
+            #         filter: "voxel"
+            #         voxel_min_points: 0
+            #         max_z: 0.1
+            #         min_z: -0.1
 
 global_costmap:
     global_costmap:
@@ -128,15 +171,22 @@ global_costmap:
             update_frequency: 1.0
             publish_frequency: 1.0
             always_send_full_costmap: True
-            global_frame: map
+            global_frame: map        # map == odom (static identity TF); no persistent/SLAM map
             robot_base_frame: base_footprint
-            rolling_window: true
-            width: 20
+            rolling_window: true     # map-less: global costmap is a live window centered on the robot
+            width: 20                # planning horizon (~10 m radius); raise for goals farther ahead
             height: 20
             robot_radius: 0.35
             resolution: 0.2
-            track_unknown_space: false
-            plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+            track_unknown_space: false   # treat unseen space as free so we can plan toward a goal before seeing it
+            plugins:
+                [
+                    "obstacle_layer",
+                    "white_lane_layer",
+                    "yellow_lane_layer",
+                    "denoise_layer",
+                    "inflation_layer",
+                ]
             static_layer:
                 plugin: "nav2_costmap_2d::StaticLayer"
                 enabled: true
@@ -150,23 +200,60 @@ global_costmap:
                 plugin: "nav2_costmap_2d::InflationLayer"
                 cost_scaling_factor: 5.0
                 inflation_radius: 0.3
+
             obstacle_layer:
                 plugin: "nav2_costmap_2d::ObstacleLayer"
                 enabled: true
+                combination_method: 1
+                footprint_clearing_enabled: true
                 observation_sources: pointcloud
                 pointcloud:
-                    data_type: PointCloud2
+                    # Valid ObstacleLayer keys (see local_costmap note); was silently no-op before.
+                    data_type: "PointCloud2"
                     topic: /velodyne_points
-                    obstacle_range: 20.0
-                    min_obstacle_height: 0.25
-                    max_obstacle_height: 2.0
-                    max_obstacle_distance: 20.0
-                    min_z: 0.1
-                    max_z: 2.0
-                    filter: "voxel"
-                    voxel_min_points: 0
-                    clearing: true
                     marking: true
+                    clearing: true
+                    min_obstacle_height: 0.2     # reject ground returns
+                    max_obstacle_height: 2.0
+                    obstacle_max_range: 20.0     # was obstacle_range (ignored -> defaulted 2.5)
+                    obstacle_min_range: 0.0
+                    raytrace_max_range: 22.0     # was max_obstacle_distance (ignored -> defaulted 3.0)
+                    raytrace_min_range: 0.0
+
+            white_lane_layer:
+                # Converted STVL -> ObstacleLayer (STVL pkg not installed); mirrors local costmap lane layer
+                plugin: "nav2_costmap_2d::ObstacleLayer"
+                enabled: true
+                combination_method: 1
+                footprint_clearing_enabled: false
+                min_obstacle_height: -0.5
+                max_obstacle_height: 2.0
+                observation_sources: white_lines
+                white_lines:
+                    topic: /white_lane_points
+                    obstacle_max_range: 5.5
+                    raytrace_max_range: 6.0
+                    clearing: False
+                    marking: True
+                    data_type: "PointCloud2"
+
+            yellow_lane_layer:
+                # Converted STVL -> ObstacleLayer (STVL pkg not installed); mirrors local costmap lane layer
+                plugin: "nav2_costmap_2d::ObstacleLayer"
+                enabled: true
+                combination_method: 1
+                footprint_clearing_enabled: false
+                min_obstacle_height: -0.5
+                max_obstacle_height: 2.0
+                observation_sources: yellow_lines
+                yellow_lines:
+                    topic: /yellow_lane_points
+                    obstacle_max_range: 5.5
+                    raytrace_max_range: 6.0
+                    clearing: False
+                    marking: True
+                    data_type: "PointCloud2"
+
             # white_line_layer:
             #     plugin: "nav2_costmap_2d::StaticLayer"
             #     map_topic: /white_line_map
@@ -176,37 +263,37 @@ global_costmap:
             #     unknown_cost_value: 0
             #     trinary_costmap: false             # IMPORTANT: keep full 0–100 range, not binarized
             #     enabled: true
-            line_stvl_layer:
-                plugin: "spatio_temporal_voxel_layer/SpatioTemporalVoxelLayer"
-                enabled: true
-                voxel_decay: 10.0                 # Time before voxels decay (seconds)
-                decay_model: 0                    # 0=linear, 1=exponential  
-                voxel_size: 0.1                   # Match costmap resolution
-                track_unknown_space: false        # Lines don't need unknown space
-                unknown_threshold: 15
-                mark_threshold: 0
-                update_footprint_enabled: true
-                combination_method: 1
-                origin_z: 0.0
-                publish_voxel_map: false          # Disable unless debugging
-                transform_tolerance: 0.9
-                mapping_mode: false
-                observation_sources: camera_lines
-                camera_lines:
-                    data_type: PointCloud2
-                    topic: /camera_line_points
-                    marking: true
-                    clearing: false                  # No raytracing clearing
-                    obstacle_range: 5.0
-                    min_obstacle_height: -0.1
-                    max_obstacle_height: 0.1          # Thin ground layer for lines
-                    expected_update_rate: 0.0         # Don't timeout on brief pauses
-                    observation_persistence: 0.0
-                    inf_is_valid: false
-                    filter: "voxel"
-                    voxel_min_points: 0
-                    max_z: 0.1
-                    min_z: -0.1
+            # line_stvl_layer:
+            #     plugin: "spatio_temporal_voxel_layer/SpatioTemporalVoxelLayer"
+            #     enabled: true
+            #     voxel_decay: 10.0                 # Time before voxels decay (seconds)
+            #     decay_model: 0                    # 0=linear, 1=exponential
+            #     voxel_size: 0.1                   # Match costmap resolution
+            #     track_unknown_space: false        # Lines don't need unknown space
+            #     unknown_threshold: 15
+            #     mark_threshold: 0
+            #     update_footprint_enabled: true
+            #     combination_method: 1
+            #     origin_z: 0.0
+            #     publish_voxel_map: false          # Disable unless debugging
+            #     transform_tolerance: 0.9
+            #     mapping_mode: false
+            #     observation_sources: camera_lines
+            #     camera_lines:
+            #         data_type: PointCloud2
+            #         topic: /camera_line_points
+            #         marking: true
+            #         clearing: false                  # No raytracing clearing
+            #         obstacle_range: 5.0
+            #         min_obstacle_height: -0.1
+            #         max_obstacle_height: 0.1          # Thin ground layer for lines
+            #         expected_update_rate: 0.0         # Don't timeout on brief pauses
+            #         observation_persistence: 0.0
+            #         inf_is_valid: false
+            #         filter: "voxel"
+            #         voxel_min_points: 0
+            #         max_z: 0.1
+            #         min_z: -0.1
 
 slam_toolbox:
     ros__parameters:
@@ -660,7 +747,7 @@ behavior_server:
         local_footprint_topic: local_costmap/published_footprint
         global_footprint_topic: global_costmap/published_footprint
         cycle_frequency: 10.0
-        behavior_plugins: ["backup", "drive_on_heading", "assisted_teleop", "wait"]  # no spin: Ackermann cannot rotate in place
+        behavior_plugins: ["backup", "drive_on_heading", "assisted_teleop", "wait"] # no spin: Ackermann cannot rotate in place
         backup:
             plugin: "nav2_behaviors::BackUp"
         drive_on_heading:
